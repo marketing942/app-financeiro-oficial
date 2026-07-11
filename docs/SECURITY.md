@@ -26,6 +26,7 @@ Modelo em camadas — **a camada que vale é o banco**:
 3. **UI**: esconde ações não permitidas (conveniência, nunca segurança).
 
 Proteções específicas:
+
 - **Acesso horizontal**: impossível por RLS (usuário A não lê workspace de B
   mesmo forjando IDs) — coberto por testes.
 - **Adulteração de `workspace_id`**: `with check` nas policies + trigger que

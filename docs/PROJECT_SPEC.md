@@ -89,6 +89,7 @@ instruções de pagamento, vínculos (projeto, ativo, dívida, investimento),
 observação, criador, último editor, timestamps e `deleted_at`.
 
 Regras:
+
 - **Nunca `float`** — `numeric(14,2)`.
 - Transferências: reduzem uma conta, aumentam outra; não são receita nem
   despesa; não alteram patrimônio líquido.
@@ -177,7 +178,7 @@ dados bancários.
 Limite mensal/anual por categoria ou subcategoria, com tolerância e vigência.
 Indicadores: realizado, limite, disponível, % consumido, projeção, comparação
 com período anterior. Faixas: `<80%` dentro; `80–<100%` atenção; `=100%`
-**limite atingido**; `>100%` **ultrapassado**. *100% nunca é ultrapassagem* —
+**limite atingido**; `>100%` **ultrapassado**. _100% nunca é ultrapassagem_ —
 regra aplicada em cards, gráficos, alertas, relatórios, Dashboard e Nylo.
 
 ## 6. Regra 50/20/30

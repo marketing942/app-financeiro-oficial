@@ -47,35 +47,36 @@ lista de vencimentos.
 
 Todas com schema Zod → JSON Schema, executadas **no servidor**:
 
-| ferramenta | fonte de dados |
-|---|---|
-| `obter_resumo_financeiro` | `monthly_cashflow` + `income_statement` |
-| `comparar_previsto_realizado` | `monthly_cashflow` |
-| `analisar_receitas` | `income_statement` + transações income |
-| `analisar_despesas` | `category_spend` |
-| `analisar_financiamentos` | transações financing + liabilities |
-| `analisar_regra_50_20_30` | `rule_50_20_30` |
-| `consultar_investimentos` | investments + contributions |
-| `consultar_dividas` | liabilities + payments |
-| `consultar_patrimonio` | `net_worth_current` + snapshots |
-| `consultar_metas` | `goal_progress` |
-| `consultar_projetos` | `project_financials` |
-| `listar_vencimentos` | `upcoming_payments` |
-| `gerar_dados_de_grafico` | agrega das views (Structured Output p/ Recharts) |
-| `gerar_relatorio` | mesmas views dos relatórios |
-| `simular_meta` | motor de metas com parâmetros hipotéticos |
-| `simular_quitacao` | amortização sobre liabilities |
-| `simular_aporte` | projeção de saldo/reserva |
-| `criar_rascunho_de_lancamento` | produz rascunho estruturado (não grava) |
+| ferramenta                     | fonte de dados                                   |
+| ------------------------------ | ------------------------------------------------ |
+| `obter_resumo_financeiro`      | `monthly_cashflow` + `income_statement`          |
+| `comparar_previsto_realizado`  | `monthly_cashflow`                               |
+| `analisar_receitas`            | `income_statement` + transações income           |
+| `analisar_despesas`            | `category_spend`                                 |
+| `analisar_financiamentos`      | transações financing + liabilities               |
+| `analisar_regra_50_20_30`      | `rule_50_20_30`                                  |
+| `consultar_investimentos`      | investments + contributions                      |
+| `consultar_dividas`            | liabilities + payments                           |
+| `consultar_patrimonio`         | `net_worth_current` + snapshots                  |
+| `consultar_metas`              | `goal_progress`                                  |
+| `consultar_projetos`           | `project_financials`                             |
+| `listar_vencimentos`           | `upcoming_payments`                              |
+| `gerar_dados_de_grafico`       | agrega das views (Structured Output p/ Recharts) |
+| `gerar_relatorio`              | mesmas views dos relatórios                      |
+| `simular_meta`                 | motor de metas com parâmetros hipotéticos        |
+| `simular_quitacao`             | amortização sobre liabilities                    |
+| `simular_aporte`               | projeção de saldo/reserva                        |
+| `criar_rascunho_de_lancamento` | produz rascunho estruturado (não grava)          |
 
 Contrato obrigatório de cada ferramenta:
+
 1. valida usuário autenticado; 2. valida workspace da sessão (nunca aceita
-`workspace_id` vindo do modelo); 3. valida permissão do membro; 4. executa
-com o cliente Supabase do usuário (RLS aplicado); 5. usa schema Zod de
-entrada e saída; 6. limita registros (máx. 100 linhas por chamada);
-7. registra em `ai_tool_calls` + `audit_logs` quando relevante; 8. jamais
-retorna dados de outro espaço; 9. mascara dados sensíveis (instruções de
-pagamento saem sempre mascaradas para o modelo).
+   `workspace_id` vindo do modelo); 3. valida permissão do membro; 4. executa
+   com o cliente Supabase do usuário (RLS aplicado); 5. usa schema Zod de
+   entrada e saída; 6. limita registros (máx. 100 linhas por chamada);
+2. registra em `ai_tool_calls` + `audit_logs` quando relevante; 8. jamais
+   retorna dados de outro espaço; 9. mascara dados sensíveis (instruções de
+   pagamento saem sempre mascaradas para o modelo).
 
 ## 4. Fluxo de escrita (rascunho + confirmação)
 

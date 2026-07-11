@@ -4,20 +4,20 @@
 
 `.env.example` (criado na Fase 1) documenta todas — sem valores reais:
 
-| variável | escopo | descrição |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | cliente+servidor | URL do projeto Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | cliente+servidor | chave pública (RLS decide o acesso) |
-| `SUPABASE_SERVICE_ROLE_KEY` | **somente servidor** | rotinas administrativas/cron; nunca no bundle |
-| `NEXT_PUBLIC_APP_URL` | cliente+servidor | URL canônica do app (links de convite/e-mail) |
-| `OPENAI_API_KEY` | **somente servidor** | chave da OpenAI |
-| `OPENAI_MODEL` | servidor | modelo da Nylo (configurável) |
-| `NYLO_DAILY_MESSAGE_LIMIT` | servidor | teto de mensagens/usuário/dia |
-| `NYLO_MONTHLY_TOKEN_LIMIT` | servidor | teto de tokens/workspace/mês |
-| `NYLO_RETENTION_DAYS` | servidor | retenção padrão de conversas |
-| `APP_ENCRYPTION_KEY` | **somente servidor** | criptografia de campos sensíveis |
-| `MARKET_DATA_PROVIDER` | servidor | provedor de cotações (vazio = desativado) |
-| `CRON_SECRET` | servidor | autenticação dos endpoints de cron |
+| variável                        | escopo               | descrição                                     |
+| ------------------------------- | -------------------- | --------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | cliente+servidor     | URL do projeto Supabase                       |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | cliente+servidor     | chave pública (RLS decide o acesso)           |
+| `SUPABASE_SERVICE_ROLE_KEY`     | **somente servidor** | rotinas administrativas/cron; nunca no bundle |
+| `NEXT_PUBLIC_APP_URL`           | cliente+servidor     | URL canônica do app (links de convite/e-mail) |
+| `OPENAI_API_KEY`                | **somente servidor** | chave da OpenAI                               |
+| `OPENAI_MODEL`                  | servidor             | modelo da Nylo (configurável)                 |
+| `NYLO_DAILY_MESSAGE_LIMIT`      | servidor             | teto de mensagens/usuário/dia                 |
+| `NYLO_MONTHLY_TOKEN_LIMIT`      | servidor             | teto de tokens/workspace/mês                  |
+| `NYLO_RETENTION_DAYS`           | servidor             | retenção padrão de conversas                  |
+| `APP_ENCRYPTION_KEY`            | **somente servidor** | criptografia de campos sensíveis              |
+| `MARKET_DATA_PROVIDER`          | servidor             | provedor de cotações (vazio = desativado)     |
+| `CRON_SECRET`                   | servidor             | autenticação dos endpoints de cron            |
 
 Regra: segredos jamais com prefixo `NEXT_PUBLIC_`; jamais commitados.
 
