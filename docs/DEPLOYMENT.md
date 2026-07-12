@@ -12,14 +12,18 @@
 | `NEXT_PUBLIC_APP_URL`           | cliente+servidor     | URL canônica do app (links de convite/e-mail) |
 | `OPENAI_API_KEY`                | **somente servidor** | chave da OpenAI                               |
 | `OPENAI_MODEL`                  | servidor             | modelo da Nylo (configurável)                 |
-| `NYLO_DAILY_MESSAGE_LIMIT`      | servidor             | teto de mensagens/usuário/dia                 |
-| `NYLO_MONTHLY_TOKEN_LIMIT`      | servidor             | teto de tokens/workspace/mês                  |
-| `NYLO_RETENTION_DAYS`           | servidor             | retenção padrão de conversas                  |
+| `NYLO_DAILY_MESSAGE_LIMIT`      | servidor             | teto de mensagens/usuário/dia (padrão 100)    |
+| `OPENAI_INPUT_COST_PER_MTOK`    | servidor             | custo USD/1M tokens de entrada (opcional)     |
+| `OPENAI_OUTPUT_COST_PER_MTOK`   | servidor             | custo USD/1M tokens de saída (opcional)       |
 | `APP_ENCRYPTION_KEY`            | **somente servidor** | criptografia de campos sensíveis              |
 | `MARKET_DATA_PROVIDER`          | servidor             | provedor de cotações (vazio = desativado)     |
 | `CRON_SECRET`                   | servidor             | autenticação dos endpoints de cron            |
 
 Regra: segredos jamais com prefixo `NEXT_PUBLIC_`; jamais commitados.
+
+Retenção de conversas e teto mensal de mensagens da Nylo são configurações
+POR WORKSPACE no banco (`workspace_settings.nylo_retention_days` /
+`nylo_monthly_message_limit`), não variáveis de ambiente.
 
 ## 2. Supabase
 
