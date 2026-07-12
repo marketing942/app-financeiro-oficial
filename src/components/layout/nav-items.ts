@@ -1,5 +1,7 @@
 import {
   Bot,
+  Tags,
+  Wallet,
   Briefcase,
   Building,
   HandCoins,
@@ -36,6 +38,8 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export const SECONDARY_NAV_ITEMS: NavItem[] = [
+  { title: "Contas", href: "/contas", icon: Wallet },
+  { title: "Categorias", href: "/categorias", icon: Tags },
   { title: "Membros e acessos", href: "/membros", icon: Users },
   { title: "Configurações", href: "/configuracoes", icon: Settings },
 ];
