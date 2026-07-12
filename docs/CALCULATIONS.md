@@ -176,9 +176,13 @@ pessoal distinta, vinculada ao projeto apenas por referência.
 
 ```
 valor_restante        = max(0, valor_alvo − valor_atual)
-meses_totais          = meses entre data_inicial e data_final
-meses_transcorridos   = meses entre data_inicial e hoje (limitado a meses_totais)
+meses_totais          = índice(data_final) − índice(data_inicial), mínimo 1
+meses_transcorridos   = índice(hoje) − índice(data_inicial),
+                        limitado a [0, meses_totais]
 meses_restantes       = max(0, meses_totais − meses_transcorridos)
+
+-- índice(d) = ano(d) × 12 + mês(d) — granularidade de mês-calendário,
+-- coerente com competence_month (ex.: jan/2030 → jan/2031 = 12 meses).
 
 necessidade_mensal_inicial   = (valor_alvo − valor_inicial) / meses_totais
 valor_esperado_hoje          = valor_inicial
