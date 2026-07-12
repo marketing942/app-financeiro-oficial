@@ -11,8 +11,13 @@ const ERROR_MESSAGES: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ erro?: string }>;
+  searchParams: Promise<{ erro?: string; next?: string }>;
 }) {
-  const { erro } = await searchParams;
-  return <LoginForm initialError={erro ? ERROR_MESSAGES[erro] : undefined} />;
+  const { erro, next } = await searchParams;
+  return (
+    <LoginForm
+      initialError={erro ? ERROR_MESSAGES[erro] : undefined}
+      nextPath={next}
+    />
+  );
 }

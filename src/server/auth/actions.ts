@@ -44,7 +44,16 @@ function friendlyAuthError(message: string): string {
   return "Não foi possível concluir a operação. Tente novamente.";
 }
 
-export async function signIn(input: LoginInput): Promise<AuthActionResult> {
+// Apenas caminhos internos são destinos válidos pós-login.
+function safeInternalPath(path: string | undefined): string {
+  if (path && path.startsWith("/") && !path.startsWith("//")) return path;
+  return "/";
+}
+
+export async function signIn(
+  input: LoginInput,
+  nextPath?: string
+): Promise<AuthActionResult> {
   const parsed = loginSchema.safeParse(input);
   if (!parsed.success) {
     return { error: "Dados inválidos. Revise os campos e tente novamente." };
@@ -61,7 +70,7 @@ export async function signIn(input: LoginInput): Promise<AuthActionResult> {
   }
 
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(safeInternalPath(nextPath));
 }
 
 export async function signUp(input: SignUpInput): Promise<AuthActionResult> {
@@ -87,11 +96,12 @@ export async function signUp(input: SignUpInput): Promise<AuthActionResult> {
   redirect("/verificar-email");
 }
 
-export async function signOut(): Promise<void> {
+export async function signOut(nextPath?: string): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
-  redirect("/login");
+  const next = nextPath ? safeInternalPath(nextPath) : undefined;
+  redirect(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
 }
 
 export async function requestPasswordReset(

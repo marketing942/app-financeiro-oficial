@@ -19,7 +19,13 @@ import {
 import { signIn } from "@/server/auth/actions";
 import { loginSchema, type LoginInput } from "@/lib/validation/auth";
 
-export function LoginForm({ initialError }: { initialError?: string }) {
+export function LoginForm({
+  initialError,
+  nextPath,
+}: {
+  initialError?: string;
+  nextPath?: string;
+}) {
   const [serverError, setServerError] = useState<string | undefined>(
     initialError
   );
@@ -33,7 +39,7 @@ export function LoginForm({ initialError }: { initialError?: string }) {
   function onSubmit(values: LoginInput) {
     setServerError(undefined);
     startTransition(async () => {
-      const result = await signIn(values);
+      const result = await signIn(values, nextPath);
       if (result && "error" in result) {
         setServerError(result.error);
       }
