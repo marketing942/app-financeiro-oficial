@@ -165,3 +165,19 @@ html[data-privacy="on"] .tabular-nums {
   filter: blur(6px);
   user-select: none;
 }
+
+/* Impressão de relatórios: só o conteúdo, sem a moldura do app. */
+@media print {
+  aside,
+  header,
+  nav {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  body {
+    background: white;
+  }
+}
