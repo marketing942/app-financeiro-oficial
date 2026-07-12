@@ -32,7 +32,7 @@ const goalSchema = z
     name: z.string().trim().min(1, "Informe o nome.").max(100),
     type: z.enum(GOAL_TYPES),
     relatedEntityType: z
-      .enum(["category", "investment", "liability"])
+      .enum(["category", "investment", "liability", "project"])
       .optional()
       .or(z.literal("")),
     relatedEntityId: z.string().uuid().optional().or(z.literal("")),
@@ -48,6 +48,9 @@ const goalSchema = z
   })
   .refine((d) => !d.currentValueOverride || d.type === "custom", {
     message: "Valor manual só é permitido em metas personalizadas.",
+  })
+  .refine((d) => d.type !== "project" || d.relatedEntityId, {
+    message: "Meta de projeto precisa de um projeto vinculado.",
   });
 
 const goalUpdateSchema = z.object({

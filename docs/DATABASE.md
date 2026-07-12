@@ -314,9 +314,20 @@ View sobre `transactions` filtrando `project_id is not null`
 (natures `project_cost`, `project_income`, `investment_contribution`).
 Não é tabela — evita dupla contabilização.
 
-### project_assets
+### project_cost_categories
 
-| id PK | workspace_id | project_id FK | asset_id FK | unique (project_id, asset_id) |
+| id PK | workspace_id | project_id FK | name | kind ('direct','tax','commission','fee','selling_expense') | sort_order | unique (project_id, name) |
+
+- Presets semeados por trigger conforme o tipo do projeto (construção,
+  veículos, genérico). `kind` separa custo direto (resultado bruto) de
+  impostos/comissões/taxas/despesas de venda (só resultado líquido).
+- `transactions.project_cost_category_id` FK aponta para cá.
+
+### Vínculo de ativos a projetos
+
+Feito por `assets.project_id` FK (coluna já existente desde a Fase 7) —
+a tabela associativa `project_assets` prevista originalmente foi
+descartada para não haver dois mecanismos de vínculo (decisão da Fase 9).
 
 ### project_documents
 

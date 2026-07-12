@@ -42,7 +42,7 @@ type Option = { id: string; name: string };
 
 // Tipos ligados a uma entidade específica e de onde vem a opção.
 const RELATED_BY_TYPE: Partial<
-  Record<GoalType, "category" | "investment" | "liability">
+  Record<GoalType, "category" | "investment" | "liability" | "project">
 > = {
   income: "category",
   expense_limit: "category",
@@ -51,16 +51,19 @@ const RELATED_BY_TYPE: Partial<
   investment: "investment",
   acquisition: "investment",
   debt_payoff: "liability",
+  project: "project",
 };
 
 export function GoalDialog({
   categories,
   investments,
   liabilities,
+  projects,
 }: {
   categories: Option[];
   investments: Option[];
   liabilities: Option[];
+  projects: Option[];
 }) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<GoalType>("contribution");
@@ -91,7 +94,9 @@ export function GoalDialog({
         ? investments
         : relatedKind === "liability"
           ? liabilities
-          : [];
+          : relatedKind === "project"
+            ? projects
+            : [];
 
   function onSubmit(values: FormInput) {
     setServerError(undefined);
@@ -164,7 +169,7 @@ export function GoalDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {(Object.keys(GOAL_TYPE_LABELS) as GoalType[])
-                    .filter((t) => t !== "project")
+                    .filter((t) => t !== "project" || projects.length > 0)
                     .map((value) => (
                       <SelectItem key={value} value={value}>
                         {GOAL_TYPE_LABELS[value]}
@@ -199,7 +204,9 @@ export function GoalDialog({
                   ? "Categoria (opcional — vazio = todas)"
                   : relatedKind === "investment"
                     ? "Investimento (opcional — vazio = todos)"
-                    : "Dívida (opcional — vazio = todas)"}
+                    : relatedKind === "project"
+                      ? "Projeto (obrigatório)"
+                      : "Dívida (opcional — vazio = todas)"}
               </Label>
               <Select value={relatedId} onValueChange={setRelatedId}>
                 <SelectTrigger className="w-full">

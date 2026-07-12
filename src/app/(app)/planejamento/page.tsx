@@ -6,6 +6,7 @@ import { listGoalProgress } from "@/server/goals/queries";
 import { getCategories } from "@/server/categories/queries";
 import { listInvestments } from "@/server/investments/queries";
 import { listLiabilities } from "@/server/liabilities/queries";
+import { listProjects } from "@/server/projects/queries";
 import { resolvePermission } from "@/lib/permissions";
 import {
   Card,
@@ -22,12 +23,14 @@ export default async function PlanejamentoPage() {
   const { active } = await getActiveWorkspace();
   if (!active) return null;
 
-  const [goals, categories, investments, liabilities] = await Promise.all([
-    listGoalProgress(active.id),
-    getCategories(active.id),
-    listInvestments(active.id),
-    listLiabilities(active.id),
-  ]);
+  const [goals, categories, investments, liabilities, projects] =
+    await Promise.all([
+      listGoalProgress(active.id),
+      getCategories(active.id),
+      listInvestments(active.id),
+      listLiabilities(active.id),
+      listProjects(active.id),
+    ]);
 
   const canManage = resolvePermission(
     active.role,
@@ -58,6 +61,9 @@ export default async function PlanejamentoPage() {
             liabilities={liabilities
               .filter((l) => !["settled", "canceled"].includes(l.status))
               .map((l) => ({ id: l.id, name: l.name }))}
+            projects={projects
+              .filter((p) => !["canceled"].includes(p.status))
+              .map((p) => ({ id: p.id, name: p.name }))}
           />
         )}
       </div>
