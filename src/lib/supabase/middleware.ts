@@ -49,6 +49,13 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Rotas de API respondem 401 JSON nos próprios handlers (e o cron da
+  // Vercel autentica por CRON_SECRET) — redirecionar para /login aqui
+  // devolveria HTML e quebraria os jobs agendados.
+  if (pathname.startsWith("/api")) {
+    return supabaseResponse;
+  }
+
   if (!user && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

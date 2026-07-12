@@ -47,18 +47,23 @@ POR WORKSPACE no banco (`workspace_settings.nylo_retention_days` /
 1. Importar o repositório; framework Next.js (detecção automática).
 2. Configurar todas as variáveis de ambiente (Production/Preview separados —
    ideal: projeto Supabase de staging para Previews).
-3. **Cron jobs** (`vercel.json`), autenticados por `CRON_SECRET`:
-   - diário: materializar recorrências, marcar atrasos, recomputar alertas,
-     expirar convites e conversas da Nylo;
-   - mensal (dia 1): `create_net_worth_snapshot` para todos os workspaces.
+3. **Cron jobs** (`vercel.json`), autenticados por `CRON_SECRET`
+   (a Vercel envia `Authorization: Bearer $CRON_SECRET`):
+   - `/api/cron/daily` (06:00 UTC = 03:00 em Recife) → RPC
+     `run_daily_maintenance()`: marca atrasos, estende o horizonte das
+     recorrências (+12 meses), recomputa alertas de todos os workspaces
+     (impersonando o dono de cada um) e expira conversas da Nylo;
+   - `/api/cron/monthly` (dia 1, 06:30 UTC) → RPC
+     `create_monthly_snapshots()`: snapshot patrimonial de todos os
+     workspaces.
 4. Build: `next build` (inclui typecheck); lint e testes no CI antes do
    deploy.
 
 ## 4. Scripts (`package.json`)
 
 ```
-dev, build, start, lint, typecheck, test, test:watch, test:e2e,
-db:migrate, db:reset, db:seed, db:types (gerar tipos TS do schema)
+dev, build, start, lint, typecheck, test, test:watch, test:rls, test:e2e,
+format, format:check
 ```
 
 ## 5. Checklist de go-live
@@ -69,8 +74,9 @@ db:migrate, db:reset, db:seed, db:types (gerar tipos TS do schema)
 - [ ] Templates de e-mail em pt-BR revisados
 - [ ] Variáveis configuradas na Vercel (nenhum segredo com `NEXT_PUBLIC_`)
 - [ ] Crons ativos e autenticados
-- [ ] `lint`, `typecheck`, `test`, `test:e2e`, `build` verdes no CI
+- [ ] `lint`, `typecheck`, `test`, `test:rls`, `test:e2e`, `build` verdes no CI
 - [ ] Testes de segurança (SECURITY.md §9) verdes contra staging
+- [ ] `OPENAI_API_KEY` configurada e Nylo validada ponta-a-ponta em staging
 - [ ] Rate limits da Nylo configurados
 - [ ] Domínio + HTTPS + Site URL atualizada
 - [ ] Backup automático do Supabase habilitado

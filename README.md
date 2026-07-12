@@ -31,6 +31,20 @@ npm run dev
 npm run lint        # ESLint
 npm run typecheck   # tsc --noEmit
 npm run test        # Vitest (unitários)
+npm run test:rls    # RLS e regras financeiras contra PostgreSQL real
 npm run test:e2e    # Playwright (fluxos críticos)
 npm run build       # next build
 ```
+
+`npm run test:rls` sobe um cluster PostgreSQL local com um shim idêntico ao
+schema `auth` do Supabase, aplica todas as migrations e executa a suíte de
+segurança/cálculo (isolamento por workspace, revogação imediata, regra do
+100%, 50/20/30, anti-dupla-contabilização, cron de manutenção etc.).
+
+## Rotinas agendadas (produção)
+
+`vercel.json` agenda dois crons autenticados por `CRON_SECRET`:
+
+- `/api/cron/daily` — marca atrasos, estende recorrências, recomputa
+  alertas de todos os espaços e expira conversas da Nylo;
+- `/api/cron/monthly` — snapshot patrimonial mensal de todos os espaços.
