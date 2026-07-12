@@ -159,3 +159,9 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Modo privacidade: borra valores monetários (elementos .tabular-nums). */
+html[data-privacy="on"] .tabular-nums {
+  filter: blur(6px);
+  user-select: none;
+}

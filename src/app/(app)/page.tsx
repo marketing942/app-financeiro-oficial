@@ -1,8 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Settings, UserPlus } from "lucide-react";
+import { ArrowRight, Landmark, Sparkles, Target } from "lucide-react";
 
 import { getActiveWorkspace } from "@/server/workspaces/queries";
+import {
+  getDashboardSummary,
+  getExpenseDistributionChart,
+  getNetWorthEvolutionChart,
+  getRule502030,
+  listAlerts,
+  listUpcomingPayments,
+} from "@/server/dashboard/queries";
+import { getNetWorth } from "@/server/assets/queries";
+import { listGoalProgress } from "@/server/goals/queries";
+import { getProjectFinancials, listProjects } from "@/server/projects/queries";
+import { formatBRL } from "@/lib/finance/money";
+import { formatDateBR } from "@/lib/finance/labels";
+import { GOAL_STATUS_LABELS, GOAL_STATUS_VARIANTS } from "@/lib/finance/goals";
+import type { ChartPayload } from "@/lib/ai/schemas";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -10,51 +27,480 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { UnderConstruction } from "@/components/under-construction";
+import { MonthNav } from "@/components/month-nav";
+import { PrivacyToggle } from "@/components/privacy-toggle";
+import { AlertsPanel } from "@/components/alerts-panel";
+import { NyloChart } from "./nylo/nylo-chart";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
-export default async function DashboardPage() {
+function currentMonth(): string {
+  return new Date().toISOString().slice(0, 7);
+}
+
+function ruleStatusLabel(pct: string | null, status: string, kind: string) {
+  if (status === "no_base") return "sem base de cálculo";
+  const value = pct === null ? "" : `${Number(pct).toLocaleString("pt-BR")}%`;
+  if (kind === "investments") {
+    return status === "at_or_above_minimum"
+      ? `${value} — mínimo cumprido`
+      : `${value} — abaixo do mínimo de 30%`;
+  }
+  if (status === "within") {
+    return Number(pct) === (kind === "expenses" ? 50 : 20)
+      ? `${value} — limite atingido`
+      : `${value} — dentro do limite`;
+  }
+  return `${value} — ultrapassado`;
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mes?: string }>;
+}) {
+  const { mes } = await searchParams;
+  const month = /^\d{4}-\d{2}$/.test(mes ?? "") ? mes! : currentMonth();
+  const monthStart = `${month}-01`;
+
   const { active } = await getActiveWorkspace();
+  if (!active) return null;
+
+  const [
+    summary,
+    rule,
+    alerts,
+    upcoming,
+    netWorth,
+    goals,
+    projects,
+    projectFin,
+    distributionChart,
+    evolutionChart,
+  ] = await Promise.all([
+    getDashboardSummary(active.id, monthStart, monthStart),
+    getRule502030(active.id, monthStart, monthStart),
+    listAlerts(active.id),
+    listUpcomingPayments(active.id, 15),
+    getNetWorth(active.id),
+    listGoalProgress(active.id),
+    listProjects(active.id),
+    getProjectFinancials(active.id),
+    getExpenseDistributionChart(active.id, monthStart, monthStart),
+    getNetWorthEvolutionChart(active.id),
+  ]);
+
+  const donut: ChartPayload | null =
+    rule && Number(rule.netIncome) > 0
+      ? {
+          kind: "rosca_50_20_30",
+          title: "Regra 50/20/30 (realizado)",
+          points: [
+            { label: "Despesas", values: { valor: rule.expenses } },
+            { label: "Financiamentos", values: { valor: rule.financing } },
+            { label: "Investimentos", values: { valor: rule.investments } },
+          ],
+        }
+      : null;
+
+  const inOutChart: ChartPayload | null = summary
+    ? {
+        kind: "entradas_saidas_mensal",
+        title: "Previsto × realizado",
+        points: [
+          {
+            label: "Entradas",
+            values: {
+              previsto: summary.netIncomePlanned,
+              realizado: summary.netIncomeActual,
+            },
+          },
+          {
+            label: "Saídas",
+            values: {
+              previsto: summary.outflowsPlanned,
+              realizado: summary.outflowsActual,
+            },
+          },
+        ],
+      }
+    : null;
+
+  const activeGoals = goals
+    .filter((g) => !["completed", "expired", "not_started"].includes(g.status))
+    .slice(0, 4);
+  const activeProjects = projects
+    .filter((p) => !["canceled", "completed"].includes(p.status))
+    .slice(0, 4);
 
   return (
     <div className="flex flex-col gap-6">
-      {active && (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <MonthNav month={month} basePath="/" />
+          <PrivacyToggle />
+        </div>
+      </div>
+
+      {summary && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Receitas líquidas</CardDescription>
+              <CardTitle className="text-xl tabular-nums">
+                {formatBRL(summary.netIncomeActual)}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-muted-foreground text-xs tabular-nums">
+              Previsto: {formatBRL(summary.netIncomePlanned)}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Despesas</CardDescription>
+              <CardTitle className="text-xl tabular-nums">
+                {formatBRL(summary.expensesActual)}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-muted-foreground text-xs tabular-nums">
+              Previsto: {formatBRL(summary.expensesPlanned)}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Saldo operacional</CardDescription>
+              <CardTitle
+                className={`text-xl tabular-nums ${
+                  Number(summary.operatingBalance) < 0
+                    ? "text-destructive"
+                    : "text-primary"
+                }`}
+              >
+                {formatBRL(summary.operatingBalance)}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-muted-foreground text-xs">
+              Receitas − despesas do período.
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Caixa livre</CardDescription>
+              <CardTitle
+                className={`text-xl tabular-nums ${
+                  Number(summary.freeCash) < 0
+                    ? "text-destructive"
+                    : "text-primary"
+                }`}
+              >
+                {formatBRL(summary.freeCash)}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-muted-foreground text-xs tabular-nums">
+              Após financiamentos ({formatBRL(summary.financingActual)}),
+              aportes ({formatBRL(summary.contributionsActual)}) e dívidas (
+              {formatBRL(summary.debtPaymentsActual)}). Fluxo do período ≠
+              patrimônio.
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {rule && Number(rule.netIncome) > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Regra 50/20/30</CardTitle>
+              <CardDescription>
+                Exatamente no limite conta como dentro — só acima de 100% é
+                ultrapassado.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 text-sm">
+              <p className="flex flex-wrap justify-between gap-2">
+                <span>Despesas (até 50%)</span>
+                <span
+                  className={
+                    rule.expensesStatus === "above"
+                      ? "text-destructive tabular-nums"
+                      : "tabular-nums"
+                  }
+                >
+                  {ruleStatusLabel(
+                    rule.pctExpenses,
+                    rule.expensesStatus,
+                    "expenses"
+                  )}
+                </span>
+              </p>
+              <p className="flex flex-wrap justify-between gap-2">
+                <span>Financiamentos e dívidas (até 20%)</span>
+                <span
+                  className={
+                    rule.financingStatus === "above"
+                      ? "text-destructive tabular-nums"
+                      : "tabular-nums"
+                  }
+                >
+                  {ruleStatusLabel(
+                    rule.pctFinancing,
+                    rule.financingStatus,
+                    "financing"
+                  )}
+                </span>
+              </p>
+              <p className="flex flex-wrap justify-between gap-2">
+                <span>Aportes e investimentos (mín. 30%)</span>
+                <span
+                  className={
+                    rule.investmentsStatus === "below_minimum"
+                      ? "text-amber-600 tabular-nums dark:text-amber-500"
+                      : "tabular-nums"
+                  }
+                >
+                  {ruleStatusLabel(
+                    rule.pctInvestments,
+                    rule.investmentsStatus,
+                    "investments"
+                  )}
+                </span>
+              </p>
+              {donut && <NyloChart chart={donut} />}
+            </CardContent>
+          </Card>
+        )}
+
+        {inOutChart && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Entradas × saídas do mês
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <NyloChart chart={inOutChart} />
+            </CardContent>
+          </Card>
+        )}
+
+        {distributionChart && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Distribuição de despesas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <NyloChart chart={distributionChart} />
+            </CardContent>
+          </Card>
+        )}
+
+        {evolutionChart && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Evolução do patrimônio
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <NyloChart chart={evolutionChart} />
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <AlertsPanel alerts={alerts} />
+
         <Card>
           <CardHeader>
-            <CardTitle>Bem-vindo(a) ao “{active.name}”</CardTitle>
-            <CardDescription>
-              Primeiros passos enquanto os módulos financeiros são construídos
-              fase a fase:
-            </CardDescription>
+            <CardTitle className="text-base">Próximos vencimentos</CardTitle>
+            <CardDescription>Próximos 15 dias.</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {active.role === "owner" && (
-              <Button asChild variant="outline" size="sm">
-                <Link href="/membros">
-                  <UserPlus />
-                  Convidar um assistente
+          <CardContent>
+            {upcoming.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                Nada a vencer nos próximos dias.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2 text-sm">
+                {upcoming.slice(0, 8).map((payment) => (
+                  <li
+                    key={payment.transactionId}
+                    className="flex items-baseline justify-between gap-2"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {payment.description}
+                    </span>
+                    <span className="text-muted-foreground text-xs whitespace-nowrap">
+                      {formatDateBR(payment.dueDate)}
+                    </span>
+                    <span className="tabular-nums">
+                      {formatBRL(payment.amount)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Landmark className="size-4" aria-hidden="true" />
+                Patrimônio
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1 text-sm tabular-nums">
+              {netWorth ? (
+                <>
+                  <p className="flex justify-between">
+                    <span>Bruto</span>
+                    <span>{formatBRL(netWorth.grossWorth)}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span>Dívidas</span>
+                    <span className="text-destructive">
+                      {formatBRL(netWorth.totalLiabilities)}
+                    </span>
+                  </p>
+                  <p className="flex justify-between font-medium">
+                    <span>Líquido</span>
+                    <span className="text-primary">
+                      {formatBRL(netWorth.netWorth)}
+                    </span>
+                  </p>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="mt-1 self-start"
+                  >
+                    <Link href="/patrimonio">
+                      Ver patrimônio
+                      <ArrowRight />
+                    </Link>
+                  </Button>
+                </>
+              ) : (
+                <p className="text-muted-foreground">Sem dados ainda.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="size-4" aria-hidden="true" />
+                Pergunte à Nylo
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 text-sm">
+              <p className="text-muted-foreground">
+                “Como foi meu mês?”, “Estou dentro da regra 50/20/30?”
+              </p>
+              <Button asChild size="sm" className="self-start">
+                <Link href="/nylo">
+                  Abrir conversa
                   <ArrowRight />
                 </Link>
               </Button>
-            )}
-            <Button asChild variant="outline" size="sm">
-              <Link href="/configuracoes">
-                <Settings />
-                Ajustar seu perfil e espaço
-                <ArrowRight />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-      <UnderConstruction
-        title="Dashboard"
-        phase="Fase 11"
-        description="O Dashboard completo (resumo do período, previsto × realizado, regra 50/20/30, patrimônio, metas e alertas) será implementado na Fase 11, alimentado pelos módulos das fases anteriores. Nenhum dado simulado é exibido aqui."
-      />
+      {(activeGoals.length > 0 || activeProjects.length > 0) && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {activeGoals.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Target className="size-4" aria-hidden="true" />
+                  Metas em andamento
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="flex flex-col gap-2 text-sm">
+                  {activeGoals.map((goal) => (
+                    <li
+                      key={goal.goalId}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {goal.name}
+                      </span>
+                      <span className="text-muted-foreground text-xs tabular-nums">
+                        {goal.progressPercent
+                          ? `${Number(goal.progressPercent).toLocaleString("pt-BR")}%`
+                          : "—"}
+                      </span>
+                      <Badge variant={GOAL_STATUS_VARIANTS[goal.status]}>
+                        {GOAL_STATUS_LABELS[goal.status]}
+                      </Badge>
+                    </li>
+                  ))}
+                </ul>
+                <Button asChild variant="ghost" size="sm" className="mt-2">
+                  <Link href="/planejamento">
+                    Ver planejamento
+                    <ArrowRight />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {activeProjects.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Projetos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="flex flex-col gap-2 text-sm">
+                  {activeProjects.map((project) => {
+                    const fin = projectFin.get(project.id);
+                    return (
+                      <li
+                        key={project.id}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <Link
+                          href={`/projetos/${project.id}`}
+                          className="min-w-0 flex-1 truncate hover:underline"
+                        >
+                          {project.name}
+                        </Link>
+                        {fin && (
+                          <span
+                            className={`text-xs tabular-nums ${
+                              Number(fin.netResult) < 0
+                                ? "text-destructive"
+                                : "text-primary"
+                            }`}
+                          >
+                            {formatBRL(fin.netResult)}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                <Button asChild variant="ghost" size="sm" className="mt-2">
+                  <Link href="/projetos">
+                    Ver projetos
+                    <ArrowRight />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }
