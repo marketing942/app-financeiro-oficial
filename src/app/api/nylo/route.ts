@@ -168,7 +168,7 @@ export async function POST(request: Request) {
   };
 
   const openai = new OpenAI({ apiKey });
-  const model = process.env.OPENAI_MODEL ?? "gpt-5";
+  const model = process.env.OPENAI_MODEL ?? "gpt-4o";
   const instructions = `${NYLO_SYSTEM_PROMPT}\n\n${buildContextBlock({
     workspaceName: active.name,
     role: active.role,
@@ -324,11 +324,28 @@ export async function POST(request: Request) {
         });
 
         send({ type: "done" });
-      } catch {
-        send({
-          type: "error",
-          message: "A Nylo encontrou um problema. Tente novamente.",
-        });
+      } catch (error) {
+        // Loga o erro real (aparece nos logs da Vercel) e devolve uma
+        // mensagem específica para as falhas de configuração comuns.
+        console.error("[nylo] falha ao gerar resposta:", error);
+        let message = "A Nylo encontrou um problema. Tente novamente.";
+        if (error instanceof OpenAI.APIError) {
+          if (error.status === 401) {
+            message =
+              "Chave da OpenAI inválida. Verifique OPENAI_API_KEY no servidor.";
+          } else if (
+            error.status === 404 ||
+            error.code === "model_not_found"
+          ) {
+            message = `Modelo de IA "${model}" não encontrado ou sem acesso na sua conta OpenAI. Ajuste a variável OPENAI_MODEL.`;
+          } else if (error.status === 429) {
+            message =
+              "Limite/cota da OpenAI atingido. Verifique o saldo e o billing da conta OpenAI.";
+          } else if (error.status === 400) {
+            message = `A OpenAI rejeitou a requisição: ${error.message}`;
+          }
+        }
+        send({ type: "error", message });
       } finally {
         controller.close();
       }
