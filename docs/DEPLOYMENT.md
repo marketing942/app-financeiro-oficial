@@ -33,14 +33,17 @@ POR WORKSPACE no banco (`workspace_settings.nylo_retention_days` /
    `https://<app>/auth/callback`, `https://<app>/redefinir-senha`,
    `http://localhost:3000/**` (dev). Templates de e-mail em pt-BR
    (confirmação, recuperação, convite).
-3. **Migrations**: `supabase db push` (CI) ou `supabase migration up`;
-   arquivos em `supabase/migrations/` são imutáveis após merge.
-4. **Seed**: `supabase/seed.sql` (idempotente) — categorias padrão, grupos,
-   role_permissions, presets de custo.
-5. **Storage**: bucket `project-documents` privado com policies por
-   workspace.
-6. Desenvolvimento local: `supabase start` (Docker) + `supabase db reset`
-   (aplica migrations + seed). Testes de RLS rodam contra essa instância.
+3. **Migrations**: aplicar as 13 (`0001`–`0013`) na ordem — via
+   `supabase db push`/`supabase migration up`, ou colando o SQL no SQL
+   Editor. Imutáveis após merge.
+4. **Seeds** (sem `seed.sql` separado): categorias padrão, `role_permissions`
+   e presets de custo de projeto são semeados automaticamente pelas próprias
+   migrations — categorias por trigger no cadastro (`handle_new_user` →
+   `handle_new_workspace`), presets por trigger na criação do projeto.
+5. **Storage** (opcional, só para upload de documentos de projeto): bucket
+   `project-documents` privado com policies por workspace.
+6. Desenvolvimento local: `supabase start` (Docker) + `supabase db reset`.
+   Testes de RLS: `npm run test:rls` (sobe um PostgreSQL local próprio).
 
 ## 3. Vercel
 
@@ -68,7 +71,7 @@ format, format:check
 
 ## 5. Checklist de go-live
 
-- [ ] Migrations aplicadas e seed executado
+- [ ] 13 migrations aplicadas na ordem (seeds automáticos, sem seed.sql)
 - [ ] RLS ativa em todas as tabelas (query de verificação no CI)
 - [ ] Confirmação de e-mail ON; URLs de redirect corretas
 - [ ] Templates de e-mail em pt-BR revisados
