@@ -10,11 +10,11 @@
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | cliente+servidor     | chave pública (RLS decide o acesso)           |
 | `SUPABASE_SERVICE_ROLE_KEY`     | **somente servidor** | rotinas administrativas/cron; nunca no bundle |
 | `NEXT_PUBLIC_APP_URL`           | cliente+servidor     | URL canônica do app (links de convite/e-mail) |
-| `OPENAI_API_KEY`                | **somente servidor** | chave da OpenAI                               |
-| `OPENAI_MODEL`                  | servidor             | modelo da Nylo (configurável)                 |
+| `ANTHROPIC_API_KEY`             | **somente servidor** | chave da Anthropic/Claude (`sk-ant-...`)      |
+| `ANTHROPIC_MODEL`               | servidor             | modelo da Nylo (padrão `claude-opus-4-8`)     |
 | `NYLO_DAILY_MESSAGE_LIMIT`      | servidor             | teto de mensagens/usuário/dia (padrão 100)    |
-| `OPENAI_INPUT_COST_PER_MTOK`    | servidor             | custo USD/1M tokens de entrada (opcional)     |
-| `OPENAI_OUTPUT_COST_PER_MTOK`   | servidor             | custo USD/1M tokens de saída (opcional)       |
+| `ANTHROPIC_INPUT_COST_PER_MTOK` | servidor             | custo USD/1M tokens de entrada (opcional)     |
+| `ANTHROPIC_OUTPUT_COST_PER_MTOK`| servidor             | custo USD/1M tokens de saída (opcional)       |
 | `APP_ENCRYPTION_KEY`            | **somente servidor** | criptografia de campos sensíveis              |
 | `MARKET_DATA_PROVIDER`          | servidor             | provedor de cotações (vazio = desativado)     |
 | `CRON_SECRET`                   | servidor             | autenticação dos endpoints de cron            |
@@ -79,7 +79,7 @@ format, format:check
 - [ ] Crons ativos e autenticados
 - [ ] `lint`, `typecheck`, `test`, `test:rls`, `test:e2e`, `build` verdes no CI
 - [ ] Testes de segurança (SECURITY.md §9) verdes contra staging
-- [ ] `OPENAI_API_KEY` configurada e Nylo validada ponta-a-ponta em staging
+- [ ] `ANTHROPIC_API_KEY` configurada e Nylo validada ponta-a-ponta em staging
 - [ ] Rate limits da Nylo configurados
 - [ ] Domínio + HTTPS + Site URL atualizada
 - [ ] Backup automático do Supabase habilitado

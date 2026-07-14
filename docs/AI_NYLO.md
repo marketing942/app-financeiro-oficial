@@ -16,7 +16,7 @@ Route Handler (Node runtime, servidor)
    2. Valida membership + permissões no workspace ativo
    3. Rate limiting (usuário e workspace) via ai_usage_logs
    4. Monta contexto: system prompt + resumo do período + histórico da conversa
-   5. OpenAI Responses API (streaming) com function calling
+   5. Anthropic Messages API (streaming) com tool use (function calling)
    6. Ferramentas executam no data-access layer com o CLIENTE SUPABASE DO
       USUÁRIO (anon key + sessão) → RLS decide o acesso, nunca a IA
    7. Persiste mensagens, tool calls, uso e custo
@@ -24,8 +24,9 @@ Route Handler (Node runtime, servidor)
 Stream SSE → UI (texto, tabelas, gráficos via Structured Outputs)
 ```
 
-- SDK oficial OpenAI para TypeScript; **Responses API**; modelo definido por
-  `OPENAI_MODEL` (env); `OPENAI_API_KEY` **somente no servidor** (nunca
+- SDK oficial Anthropic para TypeScript (`@anthropic-ai/sdk`); **Messages API**
+  com streaming e tool use; modelo definido por `ANTHROPIC_MODEL` (env, padrão
+  `claude-opus-4-8`); `ANTHROPIC_API_KEY` **somente no servidor** (nunca
   `NEXT_PUBLIC_*`).
 - Structured Outputs (JSON Schema estrito) para: dados de gráfico, linhas de
   relatório e rascunhos de lançamento — a UI renderiza componentes nativos
@@ -95,7 +96,7 @@ A Nylo **nunca** grava diretamente. Sem confirmação → nada acontece.
 
 ## 5. Segurança
 
-- Chave OpenAI apenas no servidor; nenhum segredo no bundle do cliente.
+- Chave Anthropic apenas no servidor; nenhum segredo no bundle do cliente.
 - Minimização de dados: apenas agregados e registros necessários à pergunta;
   **nunca** enviar senhas, tokens, CVV, credenciais bancárias, chaves Pix
   completas ou linhas digitáveis (mascarados antes do prompt).

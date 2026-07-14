@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
@@ -22,6 +22,7 @@ export const maxDuration = 120;
 
 const MAX_TOOL_ROUNDS = 6;
 const MAX_HISTORY_MESSAGES = 30;
+const DEFAULT_MODEL = "claude-opus-4-8";
 
 const requestSchema = z.object({
   conversationId: z.string().uuid().optional(),
@@ -48,12 +49,12 @@ function currentMonthRange(): { from: string; to: string } {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       {
         error:
-          "A Nylo não está configurada neste ambiente (OPENAI_API_KEY ausente).",
+          "A Nylo não está configurada neste ambiente (ANTHROPIC_API_KEY ausente).",
       },
       { status: 503 }
     );
@@ -63,7 +64,9 @@ export async function POST(request: Request) {
   if (!body.success) {
     return NextResponse.json(
       { error: "Requisição inválida." },
-      { status: 400 }
+      {
+        status: 400,
+      }
     );
   }
 
@@ -107,7 +110,9 @@ export async function POST(request: Request) {
     if (!conv) {
       return NextResponse.json(
         { error: "Conversa não encontrada." },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
   } else {
@@ -146,6 +151,7 @@ export async function POST(request: Request) {
     .from("ai_messages")
     .select("role, content")
     .eq("conversation_id", conversationId)
+    .in("role", ["user", "assistant"])
     .order("created_at", { ascending: false })
     .limit(MAX_HISTORY_MESSAGES);
 
@@ -167,9 +173,9 @@ export async function POST(request: Request) {
     periodTo: body.data.periodTo ?? defaults.to,
   };
 
-  const openai = new OpenAI({ apiKey });
-  const model = process.env.OPENAI_MODEL ?? "gpt-4o";
-  const instructions = `${NYLO_SYSTEM_PROMPT}\n\n${buildContextBlock({
+  const anthropic = new Anthropic({ apiKey });
+  const model = process.env.ANTHROPIC_MODEL ?? DEFAULT_MODEL;
+  const system = `${NYLO_SYSTEM_PROMPT}\n\n${buildContextBlock({
     workspaceName: active.name,
     role: active.role,
     periodFrom: toolCtx.periodFrom,
@@ -177,18 +183,17 @@ export async function POST(request: Request) {
     today: new Date().toISOString().slice(0, 10),
   })}`;
 
-  const openaiTools = NYLO_TOOLS.map((tool) => ({
-    type: "function" as const,
+  const tools: Anthropic.Tool[] = NYLO_TOOLS.map((tool) => ({
     name: tool.name,
     description: tool.description,
-    parameters: z.toJSONSchema(tool.schema) as Record<string, unknown>,
-    strict: false,
+    input_schema: z.toJSONSchema(tool.schema) as Anthropic.Tool.InputSchema,
   }));
 
-  const initialInput: OpenAI.Responses.ResponseInput = [
+  // Histórico (mais antigo → mais novo) + a mensagem atual.
+  const messages: Anthropic.MessageParam[] = [
     ...(history ?? [])
       .reverse()
-      .filter((m) => m.role === "user" || m.role === "assistant")
+      .filter((m) => m.content && m.content.trim().length > 0)
       .map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
@@ -210,59 +215,59 @@ export async function POST(request: Request) {
       try {
         send({ type: "conversation", conversationId });
 
-        let input: OpenAI.Responses.ResponseInput = initialInput;
-        let previousResponseId: string | undefined;
-
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-          const response = openai.responses.stream({
+          const messageStream = anthropic.messages.stream({
             model,
-            instructions,
-            input,
-            tools: openaiTools,
-            previous_response_id: previousResponseId,
-            max_output_tokens: 2048,
+            max_tokens: 2048,
+            system,
+            tools,
+            messages,
           });
 
-          for await (const event of response) {
-            if (event.type === "response.output_text.delta") {
-              fullText += event.delta;
-              send({ type: "text", delta: event.delta });
+          for await (const event of messageStream) {
+            if (
+              event.type === "content_block_delta" &&
+              event.delta.type === "text_delta"
+            ) {
+              fullText += event.delta.text;
+              send({ type: "text", delta: event.delta.text });
             }
           }
 
-          const final = await response.finalResponse();
-          previousResponseId = final.id;
-          inputTokens += final.usage?.input_tokens ?? 0;
-          outputTokens += final.usage?.output_tokens ?? 0;
+          const final = await messageStream.finalMessage();
+          inputTokens += final.usage.input_tokens;
+          outputTokens += final.usage.output_tokens;
 
-          const functionCalls = final.output.filter(
-            (item) => item.type === "function_call"
-          );
-          if (functionCalls.length === 0) break;
+          if (final.stop_reason !== "tool_use") break;
 
-          const outputs: OpenAI.Responses.ResponseInput = [];
-          for (const call of functionCalls) {
+          // Fecha o turno do assistente (texto + chamadas de ferramenta) e
+          // devolve os resultados no turno seguinte do usuário.
+          messages.push({ role: "assistant", content: final.content });
+
+          const toolResults: Anthropic.ToolResultBlockParam[] = [];
+          for (const block of final.content) {
+            if (block.type !== "tool_use") continue;
             const started = Date.now();
-            const tool = findTool(call.name);
+            const tool = findTool(block.name);
             let output: string;
+            let isError = false;
             let status: "ok" | "denied" | "error" = "ok";
             let summary = "";
 
             if (!tool) {
               status = "error";
+              isError = true;
               output = JSON.stringify({ erro: "ferramenta inexistente" });
             } else if (!isToolAllowed(tool, active.role, active.permissions)) {
               status = "denied";
+              isError = true;
               summary = "Permissão negada";
               output = JSON.stringify({
                 erro: "sem permissão para esta ferramenta — informe o usuário",
               });
             } else {
               try {
-                const result = await tool.execute(
-                  toolCtx,
-                  JSON.parse(call.arguments || "{}")
-                );
+                const result = await tool.execute(toolCtx, block.input);
                 summary = result.summary;
                 output = JSON.stringify(result.data);
                 if (result.structured) {
@@ -271,6 +276,7 @@ export async function POST(request: Request) {
                 }
               } catch {
                 status = "error";
+                isError = true;
                 output = JSON.stringify({
                   erro: "falha ao executar a consulta",
                 });
@@ -280,20 +286,22 @@ export async function POST(request: Request) {
             await supabase.from("ai_tool_calls").insert({
               workspace_id: active.id,
               user_id: user.id,
-              tool_name: call.name,
-              arguments: JSON.parse(call.arguments || "{}"),
+              tool_name: block.name,
+              arguments: block.input as Record<string, unknown>,
               result_summary: summary || null,
               status,
               duration_ms: Date.now() - started,
             });
 
-            outputs.push({
-              type: "function_call_output",
-              call_id: call.call_id,
-              output,
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              content: output,
+              is_error: isError,
             });
           }
-          input = outputs;
+
+          messages.push({ role: "user", content: toolResults });
         }
 
         // Persistência da resposta + uso/custo.
@@ -308,8 +316,8 @@ export async function POST(request: Request) {
           token_count: outputTokens,
         });
 
-        const inCost = Number(process.env.OPENAI_INPUT_COST_PER_MTOK ?? 0);
-        const outCost = Number(process.env.OPENAI_OUTPUT_COST_PER_MTOK ?? 0);
+        const inCost = Number(process.env.ANTHROPIC_INPUT_COST_PER_MTOK ?? 0);
+        const outCost = Number(process.env.ANTHROPIC_OUTPUT_COST_PER_MTOK ?? 0);
         await supabase.from("ai_usage_logs").insert({
           workspace_id: active.id,
           user_id: user.id,
@@ -329,26 +337,21 @@ export async function POST(request: Request) {
         // mensagem específica para as falhas de configuração comuns.
         console.error("[nylo] falha ao gerar resposta:", error);
         let message = "A Nylo encontrou um problema. Tente novamente.";
-        if (error instanceof OpenAI.APIError) {
+        if (error instanceof Anthropic.APIError) {
           if (error.status === 401) {
             message =
-              "Chave da OpenAI inválida. Verifique OPENAI_API_KEY no servidor.";
-          } else if (
-            error.status === 404 ||
-            error.code === "model_not_found"
-          ) {
-            message = `Modelo de IA "${model}" não encontrado ou sem acesso na sua conta OpenAI. Ajuste a variável OPENAI_MODEL.`;
+              "Chave da Anthropic inválida. Verifique ANTHROPIC_API_KEY no servidor.";
+          } else if (error.status === 404) {
+            message = `Modelo de IA "${model}" não encontrado. Ajuste a variável ANTHROPIC_MODEL.`;
           } else if (error.status === 429) {
             message =
-              "Limite/cota da OpenAI atingido. Verifique o saldo e o billing da conta OpenAI.";
+              "Limite/cota da Anthropic atingido. Verifique o saldo e o billing em console.anthropic.com.";
           } else if (error.status === 400) {
-            message = `A OpenAI rejeitou a requisição: ${error.message}`;
+            message = `A Anthropic rejeitou a requisição: ${error.message}`;
           } else {
-            message = `Erro da OpenAI (${error.status}): ${error.message}`;
+            message = `Erro da Anthropic (${error.status}): ${error.message}`;
           }
         } else if (error instanceof Error) {
-          // Erro fora da API da OpenAI (rede, timeout, banco) — mostra o
-          // motivo real, truncado, para permitir o diagnóstico.
           message = `A Nylo falhou: ${error.message.slice(0, 300)}`;
         }
         send({ type: "error", message });

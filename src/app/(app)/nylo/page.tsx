@@ -22,7 +22,7 @@ export default async function NyloPage({
   const conversationId =
     c && conversations.some((conv) => conv.id === c) ? c : null;
   const messages = conversationId ? await listMessages(conversationId) : [];
-  const configured = !!process.env.OPENAI_API_KEY;
+  const configured = !!process.env.ANTHROPIC_API_KEY;
 
   return (
     <div className="flex h-[calc(100dvh-8rem)] flex-col gap-4 lg:flex-row">
@@ -65,7 +65,7 @@ export default async function NyloPage({
             className="border-destructive/40 text-destructive mb-3 rounded-md border border-dashed p-3 text-sm"
           >
             A Nylo ainda não está configurada neste ambiente — a variável
-            OPENAI_API_KEY precisa ser definida no servidor (ver
+            ANTHROPIC_API_KEY precisa ser definida no servidor (ver
             docs/DEPLOYMENT.md). Nenhuma funcionalidade é simulada.
           </p>
         )}
