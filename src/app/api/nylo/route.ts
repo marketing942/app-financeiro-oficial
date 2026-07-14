@@ -343,7 +343,13 @@ export async function POST(request: Request) {
               "Limite/cota da OpenAI atingido. Verifique o saldo e o billing da conta OpenAI.";
           } else if (error.status === 400) {
             message = `A OpenAI rejeitou a requisição: ${error.message}`;
+          } else {
+            message = `Erro da OpenAI (${error.status}): ${error.message}`;
           }
+        } else if (error instanceof Error) {
+          // Erro fora da API da OpenAI (rede, timeout, banco) — mostra o
+          // motivo real, truncado, para permitir o diagnóstico.
+          message = `A Nylo falhou: ${error.message.slice(0, 300)}`;
         }
         send({ type: "error", message });
       } finally {
