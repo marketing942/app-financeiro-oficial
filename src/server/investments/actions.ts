@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { resolvePermission } from "@/lib/permissions";
 import { moneySchema, nonNegativeMoneySchema } from "@/lib/validation/finance";
+import { RECURRENCE_OPTIONS } from "@/lib/validation/transactions";
 import { getActiveWorkspace } from "@/server/workspaces/queries";
 
 const GENERIC_ERROR = "Não foi possível concluir a operação. Tente novamente.";
@@ -37,7 +38,11 @@ const contributionSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida."),
   accountId: z.string().uuid().optional().or(z.literal("")),
   realizedNow: z.boolean().default(false),
+  // `monthly` mantido por compatibilidade; `recurrence` generaliza para
+  // única, frequências e parcelada — igual ao lançamento de despesa.
   monthly: z.boolean().default(false),
+  recurrence: z.enum(RECURRENCE_OPTIONS).default("none"),
+  installmentCount: z.coerce.number().int().min(2).max(480).optional(),
 });
 
 const reserveSettingsSchema = z.object({
@@ -222,16 +227,26 @@ export async function createContribution(
     .maybeSingle();
   if (!investment) return { error: GENERIC_ERROR };
 
-  if (d.monthly) {
+  // `monthly` legado vira recorrência mensal; senão vale o `recurrence`.
+  const recurrence =
+    d.recurrence !== "none" ? d.recurrence : d.monthly ? "monthly" : "none";
+  const isInstallment = recurrence === "installment";
+  if (isInstallment && !d.installmentCount) {
+    return { error: "Informe o número de parcelas." };
+  }
+
+  if (recurrence !== "none") {
     const { data: series, error } = await ctx.supabase
       .from("transaction_series")
       .insert({
         workspace_id: ctx.workspace.id,
-        kind: "recurring",
+        kind: isInstallment ? "installment" : "recurring",
         nature: "investment_contribution",
         description: `Aporte — ${investment.name}`,
-        frequency: "monthly",
-        planned_amount: d.amount,
+        frequency: isInstallment ? "monthly" : recurrence,
+        planned_amount: isInstallment ? null : d.amount,
+        total_amount: isInstallment ? d.amount : null,
+        installment_count: isInstallment ? d.installmentCount : null,
         first_due_date: d.date,
         account_id: d.accountId || null,
         investment_id: d.investmentId,
@@ -242,7 +257,9 @@ export async function createContribution(
     if (error || !series) return { error: GENERIC_ERROR };
 
     const horizon = new Date(`${d.date}T12:00:00Z`);
-    horizon.setUTCMonth(horizon.getUTCMonth() + 12);
+    horizon.setUTCMonth(
+      horizon.getUTCMonth() + (isInstallment ? (d.installmentCount ?? 1) : 12)
+    );
     await ctx.supabase.rpc("generate_series_transactions", {
       p_series_id: series.id,
       p_until: horizon.toISOString().slice(0, 10),
@@ -271,7 +288,7 @@ export async function createContribution(
     action: "contribution.created",
     entity_type: "investment",
     entity_id: d.investmentId,
-    summary: `Aporte ${d.monthly ? "mensal " : ""}registrado em "${investment.name}"`,
+    summary: `Aporte ${recurrence !== "none" ? "programado " : ""}registrado em "${investment.name}"`,
   });
 
   revalidatePath("/investimentos");

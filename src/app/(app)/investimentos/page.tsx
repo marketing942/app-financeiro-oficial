@@ -82,7 +82,18 @@ export default async function InvestimentosPage() {
             </span>
           </p>
         </div>
-        {canManage && <InvestmentDialog accounts={accountOptions} />}
+        <div className="flex items-center gap-2">
+          {activeInvestments.length > 0 && (
+            <ContributionDialog
+              investments={activeInvestments.map((i) => ({
+                id: i.id,
+                name: i.name,
+              }))}
+              accounts={accountOptions}
+            />
+          )}
+          {canManage && <InvestmentDialog accounts={accountOptions} />}
+        </div>
       </div>
 
       <ReserveCard

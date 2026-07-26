@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import {
   cancelTransaction,
   deleteTransaction,
+  deleteTransactionSeriesFromHere,
   duplicateTransaction,
   markRealized,
   postponeTransaction,
@@ -381,30 +382,66 @@ export function TransactionActions({
           <DialogHeader>
             <DialogTitle>Excluir “{row.description}”?</DialogTitle>
             <DialogDescription>
-              A exclusão é lógica e auditada: o lançamento sai das listas e dos
-              cálculos, mas o histórico é preservado. Requer a permissão de
-              excluir lançamentos.
+              {row.seriesId
+                ? "Este lançamento faz parte de uma recorrência (recorrente, parcelada ou eterna). Escolha se quer excluir só este ou também os próximos ainda em aberto — os já realizados são sempre preservados."
+                : "A exclusão é lógica e auditada: o lançamento sai das listas e dos cálculos, mas o histórico é preservado. Requer a permissão de excluir lançamentos."}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setDeleteOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={isPending}
-              onClick={() =>
-                run(
-                  () => deleteTransaction({ transactionId: row.id }),
-                  "Lançamento excluído.",
-                  () => setDeleteOpen(false)
-                )
-              }
-            >
-              {isPending && <Loader2 className="size-4 animate-spin" />}
-              Excluir
-            </Button>
-          </DialogFooter>
+          {row.seriesId ? (
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                disabled={isPending}
+                onClick={() =>
+                  run(
+                    () => deleteTransaction({ transactionId: row.id }),
+                    "Lançamento excluído.",
+                    () => setDeleteOpen(false)
+                  )
+                }
+              >
+                Excluir só este lançamento
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={isPending}
+                onClick={() =>
+                  run(
+                    () =>
+                      deleteTransactionSeriesFromHere({ transactionId: row.id }),
+                    "Recorrência encerrada: este e os próximos em aberto foram excluídos.",
+                    () => setDeleteOpen(false)
+                  )
+                }
+              >
+                {isPending && <Loader2 className="size-4 animate-spin" />}
+                Excluir este e os próximos em aberto
+              </Button>
+              <Button variant="ghost" onClick={() => setDeleteOpen(false)}>
+                Cancelar
+              </Button>
+            </div>
+          ) : (
+            <DialogFooter>
+              <Button variant="secondary" onClick={() => setDeleteOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={isPending}
+                onClick={() =>
+                  run(
+                    () => deleteTransaction({ transactionId: row.id }),
+                    "Lançamento excluído.",
+                    () => setDeleteOpen(false)
+                  )
+                }
+              >
+                {isPending && <Loader2 className="size-4 animate-spin" />}
+                Excluir
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </>

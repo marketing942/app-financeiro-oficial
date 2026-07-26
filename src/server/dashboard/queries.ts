@@ -181,27 +181,53 @@ export async function getExpenseDistributionChart(
   };
 }
 
-export async function getNetWorthEvolutionChart(
+// Linha do tempo de crescimento: patrimônio líquido × total investido.
+// Usa os snapshots mensais e acrescenta o ponto atual (ao vivo) para que o
+// gráfico reflita o presente mesmo antes do próximo snapshot do cron.
+export async function getWealthEvolutionChart(
   workspaceId: string
 ): Promise<ChartPayload | null> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("net_worth_snapshots")
-    .select("snapshot_date, gross_worth, total_liabilities, net_worth")
-    .eq("workspace_id", workspaceId)
-    .order("snapshot_date", { ascending: true })
-    .limit(24);
-  if (!data?.length) return null;
+  const [{ data: snapshots }, { data: currentRows }] = await Promise.all([
+    supabase
+      .from("net_worth_snapshots")
+      .select("snapshot_date, net_worth, investments_total")
+      .eq("workspace_id", workspaceId)
+      .order("snapshot_date", { ascending: true })
+      .limit(24),
+    supabase.rpc("net_worth_current", { p_workspace: workspaceId }),
+  ]);
+
+  const points = (snapshots ?? []).map((s) => ({
+    label: String(s.snapshot_date).slice(0, 7),
+    values: {
+      Patrimônio: String(s.net_worth),
+      Investido: String(s.investments_total),
+    },
+  }));
+
+  const current = (currentRows as Record<string, unknown>[] | null)?.[0];
+  if (current) {
+    const label = new Date().toISOString().slice(0, 7);
+    const point = {
+      label,
+      values: {
+        Patrimônio: String(current.net_worth ?? "0"),
+        Investido: String(current.investments_total ?? "0"),
+      },
+    };
+    // Substitui o último ponto se for do mês corrente; senão, acrescenta.
+    if (points.length > 0 && points[points.length - 1].label === label) {
+      points[points.length - 1] = point;
+    } else {
+      points.push(point);
+    }
+  }
+
+  if (points.length === 0) return null;
   return {
     kind: "evolucao_patrimonio",
-    title: "Evolução do patrimônio",
-    points: data.map((s) => ({
-      label: String(s.snapshot_date).slice(0, 7),
-      values: {
-        bruto: String(s.gross_worth),
-        passivos: String(s.total_liabilities),
-        liquido: String(s.net_worth),
-      },
-    })),
+    title: "Patrimônio e investimentos ao longo do tempo",
+    points,
   };
 }

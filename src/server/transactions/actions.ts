@@ -636,6 +636,32 @@ export async function deleteTransaction(input: unknown): Promise<ActionResult> {
   return { success: true };
 }
 
+// Exclui esta ocorrência e as próximas em aberto da mesma série, encerrando
+// a recorrência (não regenera). Realizadas são preservadas.
+export async function deleteTransactionSeriesFromHere(
+  input: unknown
+): Promise<ActionResult> {
+  const parsed = transactionIdSchema.safeParse(input);
+  if (!parsed.success) return { error: GENERIC_ERROR };
+  const ctx = await requireMemberContext();
+  if (!ctx) return { error: GENERIC_ERROR };
+
+  const { data, error } = await ctx.supabase.rpc("soft_delete_series_from", {
+    p_transaction_id: parsed.data.transactionId,
+  });
+
+  if (error) {
+    if (error.message.includes("not_authorized")) {
+      return { error: "Você não tem permissão para excluir lançamentos." };
+    }
+    return { error: GENERIC_ERROR };
+  }
+  if (!data) return { error: GENERIC_ERROR };
+
+  revalidateAll();
+  return { success: true };
+}
+
 export type RevealedInstruction = {
   pixKey: string | null;
   digitableLine: string | null;

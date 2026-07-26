@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Landmark, Sparkles, Target } from "lucide-react";
+import { ArrowRight, Landmark, PiggyBank, Sparkles, Target } from "lucide-react";
 
 import { getActiveWorkspace } from "@/server/workspaces/queries";
 import {
   getDashboardSummary,
   getExpenseDistributionChart,
-  getNetWorthEvolutionChart,
   getRule502030,
+  getWealthEvolutionChart,
   listAlerts,
   listUpcomingPayments,
 } from "@/server/dashboard/queries";
@@ -15,8 +15,12 @@ import { getNetWorth } from "@/server/assets/queries";
 import { listGoalProgress } from "@/server/goals/queries";
 import { getProjectFinancials, listProjects } from "@/server/projects/queries";
 import { formatBRL } from "@/lib/finance/money";
-import { formatDateBR } from "@/lib/finance/labels";
-import { GOAL_STATUS_LABELS, GOAL_STATUS_VARIANTS } from "@/lib/finance/goals";
+import { formatDateBR, formatMonthBR } from "@/lib/finance/labels";
+import {
+  GOAL_STATUS_LABELS,
+  GOAL_STATUS_VARIANTS,
+  type GoalProgress,
+} from "@/lib/finance/goals";
 import type { ChartPayload } from "@/lib/ai/schemas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,12 +31,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { MonthNav } from "@/components/month-nav";
+import { PeriodFilter } from "@/components/period-filter";
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { AlertsPanel } from "@/components/alerts-panel";
 import { NyloChart } from "./nylo/nylo-chart";
 
 export const metadata: Metadata = { title: "Dashboard" };
+
+const MONTH_RE = /^\d{4}-\d{2}$/;
 
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);
@@ -54,14 +60,47 @@ function ruleStatusLabel(pct: string | null, status: string, kind: string) {
   return `${value} — ultrapassado`;
 }
 
+// Barra + rótulo de progresso de meta exibidos nos cards de patrimônio e
+// investido (reflexo das metas da aba Planejamento).
+function GoalReflection({ goal }: { goal: GoalProgress }) {
+  const pct = goal.progressPercent ? Number(goal.progressPercent) : null;
+  return (
+    <div className="mt-1 flex flex-col gap-1">
+      {pct !== null && (
+        <div
+          role="progressbar"
+          aria-valuenow={Math.min(100, Math.round(pct))}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Progresso da meta ${goal.name}`}
+          className="bg-muted h-1.5 w-full overflow-hidden rounded-full"
+        >
+          <div
+            className="bg-primary h-full rounded-full"
+            style={{ width: `${Math.min(100, pct)}%` }}
+          />
+        </div>
+      )}
+      <span className="text-muted-foreground text-xs">
+        {pct !== null ? `${pct.toLocaleString("pt-BR")}% da ` : "Meta: "}
+        meta de {formatBRL(goal.targetValue)}
+      </span>
+    </div>
+  );
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ de?: string; ate?: string; mes?: string }>;
 }) {
-  const { mes } = await searchParams;
-  const month = /^\d{4}-\d{2}$/.test(mes ?? "") ? mes! : currentMonth();
-  const monthStart = `${month}-01`;
+  const params = await searchParams;
+  // Compatível com o antigo ?mes; senão usa ?de&ate (faixa mensal).
+  const fallback = MONTH_RE.test(params.mes ?? "") ? params.mes! : currentMonth();
+  const de = MONTH_RE.test(params.de ?? "") ? params.de! : fallback;
+  const ate = MONTH_RE.test(params.ate ?? "") ? params.ate! : de;
+  const from = `${de}-01`;
+  const to = `${ate}-01`;
 
   const { active } = await getActiveWorkspace();
   if (!active) return null;
@@ -76,19 +115,31 @@ export default async function DashboardPage({
     projects,
     projectFin,
     distributionChart,
-    evolutionChart,
+    wealthChart,
   ] = await Promise.all([
-    getDashboardSummary(active.id, monthStart, monthStart),
-    getRule502030(active.id, monthStart, monthStart),
+    getDashboardSummary(active.id, from, to),
+    getRule502030(active.id, from, to),
     listAlerts(active.id),
     listUpcomingPayments(active.id, 15),
     getNetWorth(active.id),
     listGoalProgress(active.id),
     listProjects(active.id),
     getProjectFinancials(active.id),
-    getExpenseDistributionChart(active.id, monthStart, monthStart),
-    getNetWorthEvolutionChart(active.id),
+    getExpenseDistributionChart(active.id, from, to),
+    getWealthEvolutionChart(active.id),
   ]);
+
+  // Metas de estoque que espelham nos cards: patrimônio líquido total e total
+  // investido (meta de investimento sem entidade específica = todos).
+  const netWorthGoal = goals.find(
+    (g) => g.type === "net_worth" && g.status !== "expired"
+  );
+  const investedGoal = goals.find(
+    (g) =>
+      g.type === "investment" &&
+      !g.relatedEntityId &&
+      g.status !== "expired"
+  );
 
   const donut: ChartPayload | null =
     rule && Number(rule.netIncome) > 0
@@ -133,81 +184,143 @@ export default async function DashboardPage({
     .filter((p) => !["canceled", "completed"].includes(p.status))
     .slice(0, 4);
 
+  const periodLabel =
+    de === ate
+      ? formatMonthBR(de)
+      : `${formatMonthBR(de)} a ${formatMonthBR(ate)}`;
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <MonthNav month={month} basePath="/" />
-          <PrivacyToggle />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground text-sm">
+            Período: <span className="capitalize">{periodLabel}</span>
+          </p>
         </div>
+        <PrivacyToggle />
       </div>
 
-      {summary && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Receitas líquidas</CardDescription>
-              <CardTitle className="text-xl tabular-nums">
-                {formatBRL(summary.netIncomeActual)}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-muted-foreground text-xs tabular-nums">
-              Previsto: {formatBRL(summary.netIncomePlanned)}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Despesas</CardDescription>
-              <CardTitle className="text-xl tabular-nums">
-                {formatBRL(summary.expensesActual)}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-muted-foreground text-xs tabular-nums">
-              Previsto: {formatBRL(summary.expensesPlanned)}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Saldo operacional</CardDescription>
-              <CardTitle
-                className={`text-xl tabular-nums ${
-                  Number(summary.operatingBalance) < 0
-                    ? "text-destructive"
-                    : "text-primary"
-                }`}
-              >
-                {formatBRL(summary.operatingBalance)}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-muted-foreground text-xs">
-              Receitas − despesas do período.
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Caixa livre</CardDescription>
-              <CardTitle
-                className={`text-xl tabular-nums ${
-                  Number(summary.freeCash) < 0
-                    ? "text-destructive"
-                    : "text-primary"
-                }`}
-              >
-                {formatBRL(summary.freeCash)}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-muted-foreground text-xs tabular-nums">
-              Após financiamentos ({formatBRL(summary.financingActual)}),
-              aportes ({formatBRL(summary.contributionsActual)}) e dívidas (
-              {formatBRL(summary.debtPaymentsActual)}). Fluxo do período ≠
-              patrimônio.
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      <PeriodFilter de={de} ate={ate} basePath="/" />
 
+      {/* Cards principais (KPIs) — sempre no topo. */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+        {summary && (
+          <>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Receitas líquidas</CardDescription>
+                <CardTitle className="text-lg tabular-nums">
+                  {formatBRL(summary.netIncomeActual)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-muted-foreground text-xs tabular-nums">
+                Previsto: {formatBRL(summary.netIncomePlanned)}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Despesas</CardDescription>
+                <CardTitle className="text-lg tabular-nums">
+                  {formatBRL(summary.expensesActual)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-muted-foreground text-xs tabular-nums">
+                Previsto: {formatBRL(summary.expensesPlanned)}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Saldo operacional</CardDescription>
+                <CardTitle
+                  className={`text-lg tabular-nums ${
+                    Number(summary.operatingBalance) < 0
+                      ? "text-destructive"
+                      : "text-primary"
+                  }`}
+                >
+                  {formatBRL(summary.operatingBalance)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-muted-foreground text-xs">
+                Receitas − despesas do período.
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Caixa livre</CardDescription>
+                <CardTitle
+                  className={`text-lg tabular-nums ${
+                    Number(summary.freeCash) < 0
+                      ? "text-destructive"
+                      : "text-primary"
+                  }`}
+                >
+                  {formatBRL(summary.freeCash)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-muted-foreground text-xs">
+                Após financiamentos, aportes e dívidas.
+              </CardContent>
+            </Card>
+          </>
+        )}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1">
+              <PiggyBank className="size-3.5" aria-hidden="true" />
+              Total investido
+            </CardDescription>
+            <CardTitle className="text-lg tabular-nums">
+              {netWorth ? formatBRL(netWorth.investmentsTotal) : "—"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-muted-foreground text-xs">
+            {investedGoal ? (
+              <GoalReflection goal={investedGoal} />
+            ) : (
+              "Soma dos investimentos ativos."
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1">
+              <Landmark className="size-3.5" aria-hidden="true" />
+              Patrimônio líquido
+            </CardDescription>
+            <CardTitle className="text-primary text-lg tabular-nums">
+              {netWorth ? formatBRL(netWorth.netWorth) : "—"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-muted-foreground text-xs">
+            {netWorthGoal ? (
+              <GoalReflection goal={netWorthGoal} />
+            ) : (
+              "Bruto − dívidas."
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Gráficos — sempre abaixo dos cards. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {wealthChart && (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-base">
+                Crescimento do patrimônio e investimentos
+              </CardTitle>
+              <CardDescription>
+                Patrimônio líquido e total investido ao longo do tempo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <NyloChart chart={wealthChart} />
+            </CardContent>
+          </Card>
+        )}
+
         {rule && Number(rule.netIncome) > 0 && (
           <Card>
             <CardHeader>
@@ -275,7 +388,7 @@ export default async function DashboardPage({
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                Entradas × saídas do mês
+                Entradas × saídas do período
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -296,21 +409,9 @@ export default async function DashboardPage({
             </CardContent>
           </Card>
         )}
-
-        {evolutionChart && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">
-                Evolução do patrimônio
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <NyloChart chart={evolutionChart} />
-            </CardContent>
-          </Card>
-        )}
       </div>
 
+      {/* Painéis de apoio. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <AlertsPanel alerts={alerts} />
 
