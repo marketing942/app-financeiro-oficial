@@ -9,6 +9,8 @@ import {
   markRealizedSchema,
   postponeSchema,
   transactionIdSchema,
+  updateExpenseSchema,
+  updateIncomeSchema,
 } from "@/lib/validation/transactions";
 import { getActiveWorkspace } from "@/server/workspaces/queries";
 
@@ -271,6 +273,123 @@ export async function createIncome(input: unknown): Promise<ActionResult> {
       summary: `Série de receita "${d.description}" criada`,
     });
   }
+
+  revalidateAll();
+  return { success: true };
+}
+
+// Edita um lançamento previsto de despesa (a ocorrência informada; séries e
+// instruções de pagamento seguem seus próprios fluxos). O realizado, quando já
+// registrado, é preservado — só os campos previstos são alterados.
+export async function updateExpense(input: unknown): Promise<ActionResult> {
+  const parsed = updateExpenseSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      error:
+        parsed.error.issues[0]?.message ?? "Dados inválidos. Revise os campos.",
+    };
+  }
+  const ctx = await requireMemberContext();
+  if (!ctx) return { error: GENERIC_ERROR };
+
+  const d = parsed.data;
+  const { data, error } = await ctx.supabase
+    .from("transactions")
+    .update({
+      description: d.description,
+      category_id: d.categoryId,
+      subcategory_id: emptyToNull(d.subcategoryId),
+      account_id: emptyToNull(d.accountId),
+      planned_amount: d.plannedAmount,
+      due_date: d.dueDate,
+      competence_month: monthOf(d.dueDate),
+      note: emptyToNull(d.note),
+      updated_by: ctx.user.id,
+    })
+    .eq("id", d.transactionId)
+    .eq("workspace_id", ctx.workspace.id)
+    .eq("nature", "consumer_expense")
+    .select("id")
+    .maybeSingle();
+  if (error || !data) return { error: GENERIC_ERROR };
+
+  await ctx.supabase.from("audit_logs").insert({
+    workspace_id: ctx.workspace.id,
+    user_id: ctx.user.id,
+    action: "transaction.updated",
+    entity_type: "transaction",
+    entity_id: d.transactionId,
+    summary: `Despesa "${d.description}" editada`,
+  });
+
+  revalidateAll();
+  return { success: true };
+}
+
+// Edita um lançamento previsto de receita (a ocorrência informada). Aceita o
+// líquido direto ou bruto + descontos; o líquido é derivado no banco.
+export async function updateIncome(input: unknown): Promise<ActionResult> {
+  const parsed = updateIncomeSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      error:
+        parsed.error.issues[0]?.message ?? "Dados inválidos. Revise os campos.",
+    };
+  }
+  const ctx = await requireMemberContext();
+  if (!ctx) return { error: GENERIC_ERROR };
+
+  const d = parsed.data;
+  const usesGross = !!d.grossPlanned;
+
+  // Zera explicitamente o modo não usado para trocas líquido↔bruto seguras.
+  const amounts = usesGross
+    ? {
+        gross_amount_planned: d.grossPlanned,
+        tax_amount_planned: d.taxPlanned || "0",
+        social_security_amount_planned: d.socialSecurityPlanned || "0",
+        fee_amount_planned: d.feePlanned || "0",
+        commission_amount_planned: d.commissionPlanned || "0",
+        other_deductions_amount_planned: d.otherDeductionsPlanned || "0",
+      }
+    : {
+        planned_amount: d.plannedAmount,
+        gross_amount_planned: null,
+        tax_amount_planned: 0,
+        social_security_amount_planned: 0,
+        fee_amount_planned: 0,
+        commission_amount_planned: 0,
+        other_deductions_amount_planned: 0,
+      };
+
+  const { data, error } = await ctx.supabase
+    .from("transactions")
+    .update({
+      description: d.description,
+      income_class: d.incomeClass,
+      category_id: emptyToNull(d.categoryId),
+      account_id: emptyToNull(d.accountId),
+      due_date: d.dueDate,
+      competence_month: monthOf(d.dueDate),
+      note: emptyToNull(d.note),
+      updated_by: ctx.user.id,
+      ...amounts,
+    })
+    .eq("id", d.transactionId)
+    .eq("workspace_id", ctx.workspace.id)
+    .eq("nature", "income")
+    .select("id")
+    .maybeSingle();
+  if (error || !data) return { error: GENERIC_ERROR };
+
+  await ctx.supabase.from("audit_logs").insert({
+    workspace_id: ctx.workspace.id,
+    user_id: ctx.user.id,
+    action: "transaction.updated",
+    entity_type: "transaction",
+    entity_id: d.transactionId,
+    summary: `Receita "${d.description}" editada`,
+  });
 
   revalidateAll();
   return { success: true };

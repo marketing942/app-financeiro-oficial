@@ -10,6 +10,11 @@ export type TransactionRow = {
   actualAmount: string | null;
   grossPlanned: string | null;
   netPlanned: string | null;
+  taxPlanned: string | null;
+  socialSecurityPlanned: string | null;
+  feePlanned: string | null;
+  commissionPlanned: string | null;
+  otherDeductionsPlanned: string | null;
   grossActual: string | null;
   netActual: string | null;
   dueDate: string | null;
@@ -20,6 +25,7 @@ export type TransactionRow = {
   categoryName: string | null;
   categoryIcon: string | null;
   categoryColor: string | null;
+  subcategoryId: string | null;
   subcategoryName: string | null;
   accountId: string | null;
   installmentNumber: number | null;
@@ -46,6 +52,11 @@ function mapRow(row: RawRow): TransactionRow {
     actualAmount: asString("actual_amount"),
     grossPlanned: asString("gross_amount_planned"),
     netPlanned: asString("net_amount_planned"),
+    taxPlanned: asString("tax_amount_planned"),
+    socialSecurityPlanned: asString("social_security_amount_planned"),
+    feePlanned: asString("fee_amount_planned"),
+    commissionPlanned: asString("commission_amount_planned"),
+    otherDeductionsPlanned: asString("other_deductions_amount_planned"),
     grossActual: asString("gross_amount_actual"),
     netActual: asString("net_amount_actual"),
     dueDate: asString("due_date"),
@@ -56,6 +67,7 @@ function mapRow(row: RawRow): TransactionRow {
     categoryName: row.category?.name ?? null,
     categoryIcon: row.category?.icon ?? null,
     categoryColor: row.category?.color ?? null,
+    subcategoryId: asString("subcategory_id"),
     subcategoryName: row.subcategory?.name ?? null,
     accountId: asString("account_id"),
     installmentNumber: (row.installment_number as number) ?? null,
@@ -68,8 +80,10 @@ function mapRow(row: RawRow): TransactionRow {
 
 const SELECT_COLUMNS = `id, nature, description, status, planned_amount,
   actual_amount, gross_amount_planned, net_amount_planned,
+  tax_amount_planned, social_security_amount_planned, fee_amount_planned,
+  commission_amount_planned, other_deductions_amount_planned,
   gross_amount_actual, net_amount_actual, due_date, realized_date,
-  competence_month, income_class, category_id, account_id,
+  competence_month, income_class, category_id, subcategory_id, account_id,
   installment_number, installment_count, series_id, payment_instruction_id,
   note, category:categories(name, icon, color), subcategory:subcategories(name)`;
 

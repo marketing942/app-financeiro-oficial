@@ -51,6 +51,14 @@ export default async function ReceitasPage({
     getAccounts(active.id),
   ]);
 
+  // Opções reutilizadas na criação e na edição de receitas.
+  const categoryOptions = categories
+    .filter((c) => !c.archivedAt)
+    .map((c) => ({ id: c.id, name: c.name }));
+  const accountOptions = accounts
+    .filter((a) => !a.archivedAt)
+    .map((a) => ({ id: a.id, name: a.name }));
+
   const summaryCards = [
     {
       label: "Bruto (previsto × realizado)",
@@ -80,12 +88,8 @@ export default async function ReceitasPage({
         <div className="flex items-center gap-2">
           <MonthNav month={month} basePath="/receitas" />
           <IncomeDialog
-            categories={categories
-              .filter((c) => !c.archivedAt)
-              .map((c) => ({ id: c.id, name: c.name }))}
-            accounts={accounts
-              .filter((a) => !a.archivedAt)
-              .map((a) => ({ id: a.id, name: a.name }))}
+            categories={categoryOptions}
+            accounts={accountOptions}
           />
         </div>
       </div>
@@ -154,7 +158,12 @@ export default async function ReceitasPage({
                     de {formatBRL(row.plannedAmount)} previsto
                   </span>
                 </div>
-                <TransactionActions row={row} kind="income" />
+                <TransactionActions
+                  row={row}
+                  kind="income"
+                  incomeCategories={categoryOptions}
+                  accounts={accountOptions}
+                />
               </CardContent>
             </Card>
           ))}

@@ -122,6 +122,68 @@ export async function createGoal(input: unknown): Promise<ActionResult> {
   return { success: true };
 }
 
+// Edição completa de meta (nome, tipo, prazo, alvo, vínculo). O progresso
+// manual (só metas personalizadas) segue por updateGoalProgressValue.
+export async function updateGoal(input: unknown): Promise<ActionResult> {
+  // goalId validado à parte: goalSchema tem refines (não é objeto extensível).
+  const idParsed = goalUpdateSchema.safeParse(input);
+  const parsed = goalSchema.safeParse(input);
+  if (!idParsed.success || !parsed.success) {
+    return {
+      error:
+        parsed.success === false
+          ? (parsed.error.issues[0]?.message ?? "Dados inválidos.")
+          : "Dados inválidos.",
+    };
+  }
+  const ctx = await requireGoalEditor();
+  if (!ctx) {
+    return { error: "Você não tem permissão para gerenciar metas." };
+  }
+
+  const d = parsed.data;
+  const { goalId } = idParsed.data;
+  const update: Record<string, unknown> = {
+    name: d.name,
+    type: d.type,
+    related_entity_type: d.relatedEntityId ? d.relatedEntityType || null : null,
+    related_entity_id: d.relatedEntityId || null,
+    initial_value: d.initialValue || "0",
+    target_value: d.targetValue,
+    start_date: d.startDate,
+    end_date: d.endDate,
+    note: d.note || null,
+    updated_by: ctx.user.id,
+  };
+  // Fora de metas personalizadas o override não pode existir (constraint no
+  // banco) — zera ao trocar de tipo. Metas personalizadas mantêm o valor
+  // manual, editável pelo fluxo próprio de progresso.
+  if (d.type !== "custom") {
+    update.current_value_override = null;
+  }
+
+  const { error, count } = await ctx.supabase
+    .from("goals")
+    .update(update, { count: "exact" })
+    .eq("id", goalId)
+    .eq("workspace_id", ctx.workspace.id)
+    .is("archived_at", null);
+
+  if (error || !count) return { error: GENERIC_ERROR };
+
+  await ctx.supabase.from("audit_logs").insert({
+    workspace_id: ctx.workspace.id,
+    user_id: ctx.user.id,
+    action: "goal.updated",
+    entity_type: "goal",
+    entity_id: goalId,
+    summary: `Meta "${d.name}" editada (alvo ${d.targetValue})`,
+  });
+
+  revalidatePath("/planejamento");
+  return { success: true };
+}
+
 export async function updateGoalProgressValue(
   input: unknown
 ): Promise<ActionResult> {

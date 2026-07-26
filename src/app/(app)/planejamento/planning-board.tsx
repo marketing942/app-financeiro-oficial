@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Archive, Loader2, Pencil } from "lucide-react";
+import { Archive, Loader2, Pencil, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 
 import { archiveGoal, updateGoalProgressValue } from "@/server/goals/actions";
@@ -37,6 +37,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { GoalDialog } from "./goal-dialog";
+
+type Option = { id: string; name: string };
 
 type QuickFilter =
   "all" | "annual" | "5y" | "10y" | "15y" | "behind" | "on_track" | "completed";
@@ -74,14 +77,23 @@ function matchesFilter(goal: GoalProgress, filter: QuickFilter): boolean {
 export function PlanningBoard({
   goals,
   canManage,
+  categories,
+  investments,
+  liabilities,
+  projects,
 }: {
   goals: GoalProgress[];
   canManage: boolean;
+  categories: Option[];
+  investments: Option[];
+  liabilities: Option[];
+  projects: Option[];
 }) {
   const [filter, setFilter] = useState<QuickFilter>("all");
   const [typeFilter, setTypeFilter] = useState<GoalType | "all">("all");
   const [overrideGoal, setOverrideGoal] = useState<GoalProgress | null>(null);
   const [overrideValue, setOverrideValue] = useState("");
+  const [editGoal, setEditGoal] = useState<GoalProgress | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const visible = useMemo(
@@ -174,6 +186,7 @@ export function PlanningBoard({
               goal={goal}
               canManage={canManage}
               isPending={isPending}
+              onEdit={() => setEditGoal(goal)}
               onArchive={() => archive(goal)}
               onEditOverride={() => {
                 setOverrideValue(goal.currentValue.replace(".", ","));
@@ -218,6 +231,19 @@ export function PlanningBoard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {editGoal && (
+        <GoalDialog
+          key={editGoal.goalId}
+          categories={categories}
+          investments={investments}
+          liabilities={liabilities}
+          projects={projects}
+          goal={editGoal}
+          open={!!editGoal}
+          onOpenChange={(open) => !open && setEditGoal(null)}
+        />
+      )}
     </div>
   );
 }
@@ -226,12 +252,14 @@ function GoalRow({
   goal,
   canManage,
   isPending,
+  onEdit,
   onArchive,
   onEditOverride,
 }: {
   goal: GoalProgress;
   canManage: boolean;
   isPending: boolean;
+  onEdit: () => void;
   onArchive: () => void;
   onEditOverride: () => void;
 }) {
@@ -300,6 +328,15 @@ function GoalRow({
 
         {canManage && (
           <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onEdit}
+              disabled={isPending}
+            >
+              <Pencil />
+              Editar
+            </Button>
             {goal.type === "custom" && (
               <Button
                 size="sm"
@@ -307,7 +344,7 @@ function GoalRow({
                 onClick={onEditOverride}
                 disabled={isPending}
               >
-                <Pencil />
+                <TrendingUp />
                 Atualizar progresso
               </Button>
             )}

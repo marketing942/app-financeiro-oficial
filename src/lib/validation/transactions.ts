@@ -132,6 +132,54 @@ export const createIncomeSchema = z
     { message: "Informe o número de parcelas.", path: ["installmentCount"] }
   );
 
+// Edição de lançamento previsto: só os campos essenciais (sem recorrência,
+// parcelamento ou instrução de pagamento — esses seguem seus próprios fluxos).
+export const updateExpenseSchema = z.object({
+  transactionId: z.string().uuid(),
+  description: z
+    .string()
+    .trim()
+    .min(1, "Informe a descrição.")
+    .max(140, "Descrição muito longa."),
+  categoryId: z.string().uuid("Escolha a categoria."),
+  subcategoryId: z.string().uuid().optional().or(z.literal("")),
+  accountId: z.string().uuid().optional().or(z.literal("")),
+  plannedAmount: nonNegativeMoneySchema,
+  dueDate: dateSchema,
+  note: z.string().trim().max(500).optional().or(z.literal("")),
+});
+
+export const updateIncomeSchema = z
+  .object({
+    transactionId: z.string().uuid(),
+    description: z
+      .string()
+      .trim()
+      .min(1, "Informe a descrição.")
+      .max(140, "Descrição muito longa."),
+    incomeClass: z.enum([
+      "active_fixed",
+      "active_variable",
+      "passive_fixed",
+      "passive_variable",
+    ]),
+    categoryId: z.string().uuid().optional().or(z.literal("")),
+    accountId: z.string().uuid().optional().or(z.literal("")),
+    plannedAmount: optionalMoney,
+    grossPlanned: optionalMoney,
+    taxPlanned: optionalMoney,
+    socialSecurityPlanned: optionalMoney,
+    feePlanned: optionalMoney,
+    commissionPlanned: optionalMoney,
+    otherDeductionsPlanned: optionalMoney,
+    dueDate: dateSchema,
+    note: z.string().trim().max(500).optional().or(z.literal("")),
+  })
+  .refine((data) => data.plannedAmount || data.grossPlanned, {
+    message: "Informe o valor líquido ou o bruto previsto.",
+    path: ["plannedAmount"],
+  });
+
 export const markRealizedSchema = z.object({
   transactionId: z.string().uuid(),
   amount: nonNegativeMoneySchema,
@@ -157,5 +205,7 @@ export const postponeSchema = z.object({
 
 export type CreateExpenseInput = z.input<typeof createExpenseSchema>;
 export type CreateIncomeInput = z.input<typeof createIncomeSchema>;
+export type UpdateExpenseInput = z.input<typeof updateExpenseSchema>;
+export type UpdateIncomeInput = z.input<typeof updateIncomeSchema>;
 export type MarkRealizedInput = z.input<typeof markRealizedSchema>;
 export { moneySchema };

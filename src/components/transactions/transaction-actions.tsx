@@ -10,6 +10,7 @@ import {
   Loader2,
   MoreVertical,
   PauseCircle,
+  Pencil,
   PlayCircle,
   Trash2,
 } from "lucide-react";
@@ -46,18 +47,32 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  ExpenseDialog,
+  type CategoryOption,
+  type Option,
+} from "@/app/(app)/despesas/expense-dialog";
+import { IncomeDialog } from "@/app/(app)/receitas/income-dialog";
 
 type Kind = "income" | "expense";
 
 export function TransactionActions({
   row,
   kind,
+  expenseCategories,
+  incomeCategories,
+  accounts,
 }: {
   row: TransactionRow;
   kind: Kind;
+  // Opções para o diálogo de edição (só quando a edição está habilitada).
+  expenseCategories?: CategoryOption[];
+  incomeCategories?: Option[];
+  accounts?: Option[];
 }) {
   const [realizeOpen, setRealizeOpen] = useState(false);
   const [postponeOpen, setPostponeOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [amount, setAmount] = useState(
     (row.plannedAmount ?? "0").replace(".", ",")
@@ -74,6 +89,10 @@ export function TransactionActions({
     "overdue",
     "partially_realized",
   ].includes(row.status);
+  const canEdit =
+    isOpenStatus &&
+    ((kind === "expense" && !!expenseCategories && !!accounts) ||
+      (kind === "income" && !!incomeCategories && !!accounts));
 
   function run(
     action: () => Promise<{ error: string } | { success: true }>,
@@ -160,6 +179,12 @@ export function TransactionActions({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {canEdit && (
+              <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+                <Pencil />
+                Editar
+              </DropdownMenuItem>
+            )}
             {isOpenStatus && (
               <DropdownMenuItem onSelect={() => setPostponeOpen(true)}>
                 <CalendarClock />
@@ -233,6 +258,26 @@ export function TransactionActions({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Editar lançamento previsto */}
+      {canEdit && kind === "expense" && expenseCategories && accounts && (
+        <ExpenseDialog
+          categories={expenseCategories}
+          accounts={accounts}
+          transaction={row}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+        />
+      )}
+      {canEdit && kind === "income" && incomeCategories && accounts && (
+        <IncomeDialog
+          categories={incomeCategories}
+          accounts={accounts}
+          transaction={row}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+        />
+      )}
 
       {/* Receber/Pagar (total ou parcial) */}
       <Dialog open={realizeOpen} onOpenChange={setRealizeOpen}>

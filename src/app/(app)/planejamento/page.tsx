@@ -38,6 +38,20 @@ export default async function PlanejamentoPage() {
     "edit_goals"
   );
 
+  // Opções de vínculo reutilizadas na criação e na edição de metas.
+  const categoryOptions = categories
+    .filter((c) => !c.archivedAt)
+    .map((c) => ({ id: c.id, name: c.name }));
+  const investmentOptions = investments
+    .filter((i) => !i.archivedAt)
+    .map((i) => ({ id: i.id, name: i.name }));
+  const liabilityOptions = liabilities
+    .filter((l) => !["settled", "canceled"].includes(l.status))
+    .map((l) => ({ id: l.id, name: l.name }));
+  const projectOptions = projects
+    .filter((p) => !["canceled"].includes(p.status))
+    .map((p) => ({ id: p.id, name: p.name }));
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -52,18 +66,10 @@ export default async function PlanejamentoPage() {
         </div>
         {canManage && (
           <GoalDialog
-            categories={categories
-              .filter((c) => !c.archivedAt)
-              .map((c) => ({ id: c.id, name: c.name }))}
-            investments={investments
-              .filter((i) => !i.archivedAt)
-              .map((i) => ({ id: i.id, name: i.name }))}
-            liabilities={liabilities
-              .filter((l) => !["settled", "canceled"].includes(l.status))
-              .map((l) => ({ id: l.id, name: l.name }))}
-            projects={projects
-              .filter((p) => !["canceled"].includes(p.status))
-              .map((p) => ({ id: p.id, name: p.name }))}
+            categories={categoryOptions}
+            investments={investmentOptions}
+            liabilities={liabilityOptions}
+            projects={projectOptions}
           />
         )}
       </div>
@@ -84,7 +90,14 @@ export default async function PlanejamentoPage() {
           </CardHeader>
         </Card>
       ) : (
-        <PlanningBoard goals={goals} canManage={canManage} />
+        <PlanningBoard
+          goals={goals}
+          canManage={canManage}
+          categories={categoryOptions}
+          investments={investmentOptions}
+          liabilities={liabilityOptions}
+          projects={projectOptions}
+        />
       )}
     </div>
   );

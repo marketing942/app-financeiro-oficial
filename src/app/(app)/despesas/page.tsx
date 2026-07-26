@@ -61,6 +61,21 @@ export default async function DespesasPage({
     getAccounts(active.id),
   ]);
 
+  // Opções (categoria → subcategoria e contas) reutilizadas na criação e na
+  // edição de despesas.
+  const categoryOptions = categories
+    .filter((c) => !c.archivedAt)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      subcategories: c.subcategories
+        .filter((s) => !s.archivedAt)
+        .map((s) => ({ id: s.id, name: s.name })),
+    }));
+  const accountOptions = accounts
+    .filter((a) => !a.archivedAt)
+    .map((a) => ({ id: a.id, name: a.name }));
+
   const totals = cashflow["consumer_expense"] ?? { planned: "0", actual: "0" };
 
   // Categoria → lançamentos (hierarquia visual da especificação).
@@ -92,18 +107,8 @@ export default async function DespesasPage({
         <div className="flex items-center gap-2">
           <MonthNav month={month} basePath="/despesas" />
           <ExpenseDialog
-            categories={categories
-              .filter((c) => !c.archivedAt)
-              .map((c) => ({
-                id: c.id,
-                name: c.name,
-                subcategories: c.subcategories
-                  .filter((s) => !s.archivedAt)
-                  .map((s) => ({ id: s.id, name: s.name })),
-              }))}
-            accounts={accounts
-              .filter((a) => !a.archivedAt)
-              .map((a) => ({ id: a.id, name: a.name }))}
+            categories={categoryOptions}
+            accounts={accountOptions}
           />
         </div>
       </div>
@@ -205,7 +210,12 @@ export default async function DespesasPage({
                         de {formatBRL(row.plannedAmount)} previsto
                       </span>
                     </div>
-                    <TransactionActions row={row} kind="expense" />
+                    <TransactionActions
+                      row={row}
+                      kind="expense"
+                      expenseCategories={categoryOptions}
+                      accounts={accountOptions}
+                    />
                   </CardContent>
                 </Card>
               ))}

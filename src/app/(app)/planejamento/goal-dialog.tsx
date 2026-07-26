@@ -7,8 +7,12 @@ import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { createGoal } from "@/server/goals/actions";
-import { GOAL_TYPE_LABELS, type GoalType } from "@/lib/finance/goals";
+import { createGoal, updateGoal } from "@/server/goals/actions";
+import {
+  GOAL_TYPE_LABELS,
+  type GoalProgress,
+  type GoalType,
+} from "@/lib/finance/goals";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -54,20 +58,35 @@ const RELATED_BY_TYPE: Partial<
   project: "project",
 };
 
+function toInputMoney(value: string | null | undefined): string {
+  return value ? value.replace(".", ",") : "";
+}
+
 export function GoalDialog({
   categories,
   investments,
   liabilities,
   projects,
+  goal,
+  open: openProp,
+  onOpenChange,
 }: {
   categories: Option[];
   investments: Option[];
   liabilities: Option[];
   projects: Option[];
+  // Presença de `goal` = modo edição (diálogo controlado pelo pai).
+  goal?: GoalProgress;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [type, setType] = useState<GoalType>("contribution");
-  const [relatedId, setRelatedId] = useState("");
+  const isEdit = !!goal;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = openProp ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
+
+  const [type, setType] = useState<GoalType>(goal?.type ?? "contribution");
+  const [relatedId, setRelatedId] = useState(goal?.relatedEntityId ?? "");
   const [serverError, setServerError] = useState<string>();
   const [isPending, startTransition] = useTransition();
 
@@ -77,12 +96,12 @@ export function GoalDialog({
   const form = useForm<FormInput>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
-      targetValue: "",
-      initialValue: "",
-      startDate: today,
-      endDate: nextYear,
-      note: "",
+      name: goal?.name ?? "",
+      targetValue: toInputMoney(goal?.targetValue),
+      initialValue: toInputMoney(goal?.initialValue),
+      startDate: goal?.startDate ?? today,
+      endDate: goal?.endDate ?? nextYear,
+      note: goal?.note ?? "",
     },
   });
 
@@ -101,19 +120,25 @@ export function GoalDialog({
   function onSubmit(values: FormInput) {
     setServerError(undefined);
     startTransition(async () => {
-      const result = await createGoal({
+      const payload = {
         ...values,
         type,
         relatedEntityType: relatedId ? relatedKind : "",
         relatedEntityId: relatedId,
-      });
+      };
+      const result = isEdit
+        ? await updateGoal({ ...payload, goalId: goal!.goalId })
+        : await createGoal(payload);
       if ("error" in result) {
         setServerError(result.error);
       } else {
-        toast.success("Meta criada.");
+        toast.success(isEdit ? "Meta atualizada." : "Meta criada.");
         setOpen(false);
-        form.reset();
-        setRelatedId("");
+        if (!isEdit) {
+          form.reset();
+          setType("contribution");
+          setRelatedId("");
+        }
       }
     });
   }
@@ -122,15 +147,17 @@ export function GoalDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus />
-          Nova meta
-        </Button>
-      </DialogTrigger>
+      {!isEdit && (
+        <DialogTrigger asChild>
+          <Button>
+            <Plus />
+            Nova meta
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nova meta</DialogTitle>
+          <DialogTitle>{isEdit ? "Editar meta" : "Nova meta"}</DialogTitle>
           <DialogDescription>
             Uma meta, vários marcos: o ritmo (esperado, diferença e necessidade
             mensal) é calculado automaticamente pelo prazo.
@@ -260,7 +287,7 @@ export function GoalDialog({
 
           <Button type="submit" disabled={isPending}>
             {isPending && <Loader2 className="size-4 animate-spin" />}
-            Criar meta
+            {isEdit ? "Salvar alterações" : "Criar meta"}
           </Button>
         </form>
       </DialogContent>
