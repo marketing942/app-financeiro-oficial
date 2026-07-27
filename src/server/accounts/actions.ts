@@ -128,25 +128,17 @@ export async function deleteAccount(input: unknown): Promise<ActionResult> {
   const ctx = await requireOwnerContext();
   if (!ctx) return { error: "Apenas o proprietário gerencia contas." };
 
-  const { data, error } = await ctx.supabase
-    .from("financial_accounts")
-    .update({ deleted_at: new Date().toISOString(), updated_by: ctx.user.id })
-    .eq("id", parsed.data.accountId)
-    .eq("workspace_id", ctx.workspace.id)
-    .is("deleted_at", null)
-    .select("name")
-    .maybeSingle();
-
-  if (error || !data) return { error: GENERIC_ERROR };
-
-  await ctx.supabase.from("audit_logs").insert({
-    workspace_id: ctx.workspace.id,
-    user_id: ctx.user.id,
-    action: "account.deleted",
-    entity_type: "financial_account",
-    entity_id: parsed.data.accountId,
-    summary: `Conta "${data.name}" excluída (exclusão lógica)`,
+  const { data, error } = await ctx.supabase.rpc("soft_delete_account", {
+    p_id: parsed.data.accountId,
   });
+
+  if (error) {
+    if (error.message.includes("not_authorized")) {
+      return { error: "Apenas o proprietário gerencia contas." };
+    }
+    return { error: GENERIC_ERROR };
+  }
+  if (!data) return { error: GENERIC_ERROR };
 
   revalidatePath("/contas");
   return { success: true };

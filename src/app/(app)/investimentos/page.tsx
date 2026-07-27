@@ -5,6 +5,7 @@ import { getActiveWorkspace } from "@/server/workspaces/queries";
 import {
   getReserveSummary,
   listInvestments,
+  listYieldsByMonth,
 } from "@/server/investments/queries";
 import {
   INVESTMENT_GROUP_LABELS,
@@ -30,6 +31,8 @@ import { TransactionActions } from "@/components/transactions/transaction-action
 import { InvestmentDialog } from "./investment-dialog";
 import { InvestmentDeleteButton } from "./investment-delete-button";
 import { ContributionDialog } from "./contribution-dialog";
+import { YieldDialog } from "./yield-dialog";
+import { YieldDeleteButton } from "./yield-delete-button";
 import { ReserveCard } from "./reserve-card";
 
 export const metadata: Metadata = { title: "Investimentos" };
@@ -57,19 +60,27 @@ export default async function InvestimentosPage({
   if (!active) return null;
 
   const supabase = await createClient();
-  const [investments, reserve, accounts, categories, contributions, settingsRow] =
-    await Promise.all([
-      listInvestments(active.id),
-      getReserveSummary(active.id),
-      getAccounts(active.id),
-      getCategories(active.id, "expense"),
-      listTransactionsByMonth(active.id, month, ["investment_contribution"]),
-      supabase
-        .from("workspace_settings")
-        .select("essential_category_ids")
-        .eq("workspace_id", active.id)
-        .maybeSingle(),
-    ]);
+  const [
+    investments,
+    reserve,
+    accounts,
+    categories,
+    contributions,
+    yields,
+    settingsRow,
+  ] = await Promise.all([
+    listInvestments(active.id),
+    getReserveSummary(active.id),
+    getAccounts(active.id),
+    getCategories(active.id, "expense"),
+    listTransactionsByMonth(active.id, month, ["investment_contribution"]),
+    listYieldsByMonth(active.id, month),
+    supabase
+      .from("workspace_settings")
+      .select("essential_category_ids")
+      .eq("workspace_id", active.id)
+      .maybeSingle(),
+  ]);
 
   const canManage = resolvePermission(
     active.role,
@@ -100,7 +111,7 @@ export default async function InvestimentosPage({
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {activeInvestments.length > 0 && (
             <ContributionDialog
               investments={activeInvestments.map((i) => ({
@@ -108,6 +119,15 @@ export default async function InvestimentosPage({
                 name: i.name,
               }))}
               accounts={accountOptions}
+            />
+          )}
+          {canManage && activeInvestments.length > 0 && (
+            <YieldDialog
+              investments={activeInvestments.map((i) => ({
+                id: i.id,
+                name: i.name,
+              }))}
+              defaultMonth={month}
             />
           )}
           {canManage && <InvestmentDialog accounts={accountOptions} />}
@@ -289,6 +309,47 @@ export default async function InvestimentosPage({
           </div>
         )}
       </section>
+
+      {yields.length > 0 && (
+        <section aria-label="Rendimentos do mês" className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold">Rendimentos do mês</h2>
+          <div className="flex flex-col gap-2">
+            {yields.map((y) => {
+              const value = Number(y.amount);
+              return (
+                <Card key={y.id}>
+                  <CardContent className="flex items-center gap-3">
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate font-medium">
+                        {y.investmentName}
+                      </span>
+                      {y.note && (
+                        <span className="text-muted-foreground text-xs">
+                          {y.note}
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={`text-sm font-semibold tabular-nums ${
+                        value < 0 ? "text-destructive" : "text-primary"
+                      }`}
+                    >
+                      {value >= 0 ? "+" : "−"}
+                      {formatBRL(Math.abs(value).toFixed(2))}
+                    </span>
+                    {canManage && (
+                      <YieldDeleteButton
+                        yieldId={y.id}
+                        label={y.investmentName}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

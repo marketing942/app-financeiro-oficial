@@ -35,6 +35,54 @@ export async function listInvestments(
   }));
 }
 
+export type InvestmentYield = {
+  id: string;
+  investmentId: string;
+  investmentName: string;
+  competenceMonth: string;
+  amount: string;
+  note: string | null;
+};
+
+// monthISO: "YYYY-MM"
+export async function listYieldsByMonth(
+  workspaceId: string,
+  monthISO: string
+): Promise<InvestmentYield[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("investment_yields")
+    .select("id, investment_id, competence_month, amount, note, investment:investments(name)")
+    .eq("workspace_id", workspaceId)
+    .eq("competence_month", `${monthISO}-01`)
+    .order("created_at", { ascending: true });
+
+  if (error || !data) return [];
+  return (data as unknown as Record<string, unknown>[]).map((row) => ({
+    id: String(row.id),
+    investmentId: String(row.investment_id),
+    investmentName:
+      (row.investment as { name?: string } | null)?.name ?? "Investimento",
+    competenceMonth: String(row.competence_month),
+    amount: String(row.amount),
+    note: (row.note as string | null) ?? null,
+  }));
+}
+
+export async function getYieldTotal(
+  workspaceId: string,
+  from: string,
+  to: string
+): Promise<string> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("investment_yield_total", {
+    p_workspace: workspaceId,
+    p_from: from,
+    p_to: to,
+  });
+  return String(data ?? "0");
+}
+
 export async function getReserveSummary(
   workspaceId: string
 ): Promise<ReserveSummary | null> {

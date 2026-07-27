@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Landmark, PiggyBank, Target } from "lucide-react";
+import {
+  ArrowRight,
+  Landmark,
+  PiggyBank,
+  Target,
+  TrendingUp,
+} from "lucide-react";
 
 import { getActiveWorkspace } from "@/server/workspaces/queries";
 import {
@@ -12,6 +18,7 @@ import {
   listUpcomingPayments,
 } from "@/server/dashboard/queries";
 import { getNetWorth } from "@/server/assets/queries";
+import { getYieldTotal } from "@/server/investments/queries";
 import { listGoalProgress } from "@/server/goals/queries";
 import { getProjectFinancials, listProjects } from "@/server/projects/queries";
 import { formatBRL } from "@/lib/finance/money";
@@ -101,6 +108,7 @@ export default async function DashboardPage({
     projectFin,
     distributionChart,
     wealthChart,
+    yieldTotal,
   ] = await Promise.all([
     getDashboardSummary(active.id, from, to),
     getRule502030(active.id, from, to),
@@ -112,6 +120,7 @@ export default async function DashboardPage({
     getProjectFinancials(active.id),
     getExpenseDistributionChart(active.id, from, to),
     getWealthEvolutionChart(active.id),
+    getYieldTotal(active.id, from, to),
   ]);
 
   // Metas de estoque que espelham nos cards: patrimônio líquido total e total
@@ -176,7 +185,7 @@ export default async function DashboardPage({
       <PeriodFilter de={de} ate={ate} basePath="/" />
 
       {/* Cards principais (KPIs) — sempre no topo. */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
         {summary && (
           <>
             <Card>
@@ -253,6 +262,25 @@ export default async function DashboardPage({
             ) : (
               "Soma dos investimentos ativos."
             )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1">
+              <TrendingUp className="size-3.5" aria-hidden="true" />
+              Rendimento
+            </CardDescription>
+            <CardTitle
+              className={`text-lg tabular-nums ${
+                Number(yieldTotal) < 0 ? "text-destructive" : "text-primary"
+              }`}
+            >
+              {Number(yieldTotal) >= 0 ? "+" : "−"}
+              {formatBRL(Math.abs(Number(yieldTotal)).toFixed(2))}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-muted-foreground text-xs">
+            Quanto seus investimentos renderam no período.
           </CardContent>
         </Card>
         <Card>

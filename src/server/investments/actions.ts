@@ -398,6 +398,91 @@ export async function updateContribution(
   return { success: true };
 }
 
+const yieldSchema = z.object({
+  investmentId: z.string().uuid(),
+  month: z.string().regex(/^\d{4}-\d{2}$/, "Mês inválido."),
+  amount: moneySchema, // com sinal: negativo = prejuízo do período
+  note: z.string().trim().max(300).optional().or(z.literal("")),
+});
+
+// Lança o rendimento (ou prejuízo) de um mês para um investimento. O saldo é
+// recomputado pelo trigger; não conta como receita de caixa.
+export async function recordYield(input: unknown): Promise<ActionResult> {
+  const parsed = yieldSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+  const ctx = await requireContext();
+  if (
+    !ctx ||
+    !resolvePermission(
+      ctx.workspace.role,
+      ctx.workspace.permissions,
+      "edit_investments"
+    )
+  ) {
+    return { error: "Você não tem permissão para gerenciar investimentos." };
+  }
+
+  const d = parsed.data;
+  const { error } = await ctx.supabase.from("investment_yields").insert({
+    workspace_id: ctx.workspace.id,
+    investment_id: d.investmentId,
+    competence_month: `${d.month}-01`,
+    amount: d.amount,
+    note: d.note || null,
+    created_by: ctx.user.id,
+    updated_by: ctx.user.id,
+  });
+  if (error) return { error: GENERIC_ERROR };
+
+  await ctx.supabase.from("audit_logs").insert({
+    workspace_id: ctx.workspace.id,
+    user_id: ctx.user.id,
+    action: "investment.yield_recorded",
+    entity_type: "investment",
+    entity_id: d.investmentId,
+    summary: `Rendimento de ${d.amount} lançado (${d.month})`,
+  });
+
+  revalidatePath("/investimentos");
+  revalidatePath("/patrimonio");
+  revalidatePath("/");
+  return { success: true };
+}
+
+export async function deleteYield(input: unknown): Promise<ActionResult> {
+  const parsed = z.object({ yieldId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { error: GENERIC_ERROR };
+  const ctx = await requireContext();
+  if (
+    !ctx ||
+    !resolvePermission(
+      ctx.workspace.role,
+      ctx.workspace.permissions,
+      "edit_investments"
+    )
+  ) {
+    return { error: "Você não tem permissão para gerenciar investimentos." };
+  }
+
+  const { data, error } = await ctx.supabase.rpc("soft_delete_yield", {
+    p_id: parsed.data.yieldId,
+  });
+  if (error) {
+    if (error.message.includes("not_authorized")) {
+      return { error: "Você não tem permissão para gerenciar investimentos." };
+    }
+    return { error: GENERIC_ERROR };
+  }
+  if (!data) return { error: GENERIC_ERROR };
+
+  revalidatePath("/investimentos");
+  revalidatePath("/patrimonio");
+  revalidatePath("/");
+  return { success: true };
+}
+
 export async function updateReserveSettings(
   input: unknown
 ): Promise<ActionResult> {
