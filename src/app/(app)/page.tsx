@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Landmark, PiggyBank, Sparkles, Target } from "lucide-react";
+import { ArrowRight, Landmark, PiggyBank, Target } from "lucide-react";
 
 import { getActiveWorkspace } from "@/server/workspaces/queries";
 import {
@@ -34,6 +34,7 @@ import {
 import { PeriodFilter } from "@/components/period-filter";
 import { PrivacyToggle } from "@/components/privacy-toggle";
 import { AlertsPanel } from "@/components/alerts-panel";
+import { Rule502030 } from "@/components/rule-50-20-30";
 import { NyloChart } from "./nylo/nylo-chart";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -42,22 +43,6 @@ const MONTH_RE = /^\d{4}-\d{2}$/;
 
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);
-}
-
-function ruleStatusLabel(pct: string | null, status: string, kind: string) {
-  if (status === "no_base") return "sem base de cálculo";
-  const value = pct === null ? "" : `${Number(pct).toLocaleString("pt-BR")}%`;
-  if (kind === "investments") {
-    return status === "at_or_above_minimum"
-      ? `${value} — mínimo cumprido`
-      : `${value} — abaixo do mínimo de 30%`;
-  }
-  if (status === "within") {
-    return Number(pct) === (kind === "expenses" ? 50 : 20)
-      ? `${value} — limite atingido`
-      : `${value} — dentro do limite`;
-  }
-  return `${value} — ultrapassado`;
 }
 
 // Barra + rótulo de progresso de meta exibidos nos cards de patrimônio e
@@ -140,19 +125,6 @@ export default async function DashboardPage({
       !g.relatedEntityId &&
       g.status !== "expired"
   );
-
-  const donut: ChartPayload | null =
-    rule && Number(rule.netIncome) > 0
-      ? {
-          kind: "rosca_50_20_30",
-          title: "Regra 50/20/30 (realizado)",
-          points: [
-            { label: "Despesas", values: { valor: rule.expenses } },
-            { label: "Financiamentos", values: { valor: rule.financing } },
-            { label: "Investimentos", values: { valor: rule.investments } },
-          ],
-        }
-      : null;
 
   const inOutChart: ChartPayload | null = summary
     ? {
@@ -326,60 +298,12 @@ export default async function DashboardPage({
             <CardHeader>
               <CardTitle className="text-base">Regra 50/20/30</CardTitle>
               <CardDescription>
-                Exatamente no limite conta como dentro — só acima de 100% é
+                % da renda líquida. No limite = atingido; só acima é
                 ultrapassado.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-2 text-sm">
-              <p className="flex flex-wrap justify-between gap-2">
-                <span>Despesas (até 50%)</span>
-                <span
-                  className={
-                    rule.expensesStatus === "above"
-                      ? "text-destructive tabular-nums"
-                      : "tabular-nums"
-                  }
-                >
-                  {ruleStatusLabel(
-                    rule.pctExpenses,
-                    rule.expensesStatus,
-                    "expenses"
-                  )}
-                </span>
-              </p>
-              <p className="flex flex-wrap justify-between gap-2">
-                <span>Financiamentos e dívidas (até 20%)</span>
-                <span
-                  className={
-                    rule.financingStatus === "above"
-                      ? "text-destructive tabular-nums"
-                      : "tabular-nums"
-                  }
-                >
-                  {ruleStatusLabel(
-                    rule.pctFinancing,
-                    rule.financingStatus,
-                    "financing"
-                  )}
-                </span>
-              </p>
-              <p className="flex flex-wrap justify-between gap-2">
-                <span>Aportes e investimentos (mín. 30%)</span>
-                <span
-                  className={
-                    rule.investmentsStatus === "below_minimum"
-                      ? "text-amber-600 tabular-nums dark:text-amber-500"
-                      : "tabular-nums"
-                  }
-                >
-                  {ruleStatusLabel(
-                    rule.pctInvestments,
-                    rule.investmentsStatus,
-                    "investments"
-                  )}
-                </span>
-              </p>
-              {donut && <NyloChart chart={donut} />}
+            <CardContent>
+              <Rule502030 rule={rule} />
             </CardContent>
           </Card>
         )}
@@ -449,7 +373,7 @@ export default async function DashboardPage({
         </Card>
 
         <div className="flex flex-col gap-6">
-          <Card>
+          <Card className="h-full">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Landmark className="size-4" aria-hidden="true" />
@@ -490,26 +414,6 @@ export default async function DashboardPage({
               ) : (
                 <p className="text-muted-foreground">Sem dados ainda.</p>
               )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Sparkles className="size-4" aria-hidden="true" />
-                Pergunte à Nylo
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 text-sm">
-              <p className="text-muted-foreground">
-                “Como foi meu mês?”, “Estou dentro da regra 50/20/30?”
-              </p>
-              <Button asChild size="sm" className="self-start">
-                <Link href="/nylo">
-                  Abrir conversa
-                  <ArrowRight />
-                </Link>
-              </Button>
             </CardContent>
           </Card>
         </div>

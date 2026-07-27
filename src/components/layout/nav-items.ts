@@ -43,13 +43,3 @@ export const SECONDARY_NAV_ITEMS: NavItem[] = [
   { title: "Membros e acessos", href: "/membros", icon: Users },
   { title: "Configurações", href: "/configuracoes", icon: Settings },
 ];
-
-// Navegação inferior no celular: 4 atalhos + "Mais".
-export const MOBILE_NAV_HREFS = [
-  "/",
-  "/receitas",
-  "/despesas",
-  "/planejamento",
-];
-
-export const ALL_NAV_ITEMS = [...NAV_ITEMS, ...SECONDARY_NAV_ITEMS];

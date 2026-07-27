@@ -129,10 +129,10 @@ export default async function ReceitasPage({
         <section aria-label="Lista de receitas" className="flex flex-col gap-2">
           {incomes.map((row) => (
             <Card key={row.id}>
-              <CardContent className="flex flex-wrap items-center gap-3">
+              <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate font-medium">
+                    <span className="font-medium break-words">
                       {row.description}
                       {row.installmentNumber
                         ? ` (${row.installmentNumber}/${row.installmentCount})`
@@ -150,20 +150,22 @@ export default async function ReceitasPage({
                     {" · "}Prevista para {formatDateBR(row.dueDate)}
                   </span>
                 </div>
-                <div className="flex flex-col items-end tabular-nums">
-                  <span className="text-sm font-semibold">
-                    {formatBRL(row.actualAmount ?? "0")}
-                  </span>
-                  <span className="text-muted-foreground text-xs">
-                    de {formatBRL(row.plannedAmount)} previsto
-                  </span>
+                <div className="flex items-center justify-between gap-3 sm:justify-end">
+                  <div className="flex flex-col items-start tabular-nums sm:items-end">
+                    <span className="text-sm font-semibold">
+                      {formatBRL(row.actualAmount ?? "0")}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      de {formatBRL(row.plannedAmount)} previsto
+                    </span>
+                  </div>
+                  <TransactionActions
+                    row={row}
+                    kind="income"
+                    incomeCategories={categoryOptions}
+                    accounts={accountOptions}
+                  />
                 </div>
-                <TransactionActions
-                  row={row}
-                  kind="income"
-                  incomeCategories={categoryOptions}
-                  accounts={accountOptions}
-                />
               </CardContent>
             </Card>
           ))}

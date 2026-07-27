@@ -41,30 +41,32 @@ import { GoalDialog } from "./goal-dialog";
 
 type Option = { id: string; name: string };
 
-type QuickFilter =
-  "all" | "annual" | "5y" | "10y" | "15y" | "behind" | "on_track" | "completed";
+type HorizonFilter = "all" | "annual" | "5y" | "10y" | "15y";
+type StatusFilter = "all" | "behind" | "on_track" | "completed";
 
-const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
-  { key: "all", label: "Todas" },
+const HORIZON_OPTIONS: { key: HorizonFilter; label: string }[] = [
+  { key: "all", label: "Todos os prazos" },
   { key: "annual", label: "Anual" },
   { key: "5y", label: "5 anos" },
   { key: "10y", label: "10 anos" },
   { key: "15y", label: "15 anos" },
+];
+
+const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
+  { key: "all", label: "Todas as situações" },
   { key: "behind", label: "Atrasadas" },
   { key: "on_track", label: "No ritmo" },
   { key: "completed", label: "Concluídas" },
 ];
 
-function matchesFilter(goal: GoalProgress, filter: QuickFilter): boolean {
-  const horizon = goalHorizon(goal.monthsTotal);
+function matchesHorizon(goal: GoalProgress, filter: HorizonFilter): boolean {
+  return filter === "all" || goalHorizon(goal.monthsTotal) === filter;
+}
+
+function matchesStatus(goal: GoalProgress, filter: StatusFilter): boolean {
   switch (filter) {
     case "all":
       return true;
-    case "annual":
-    case "5y":
-    case "10y":
-    case "15y":
-      return horizon === filter;
     case "behind":
       return goal.status === "behind" || goal.status === "expired";
     case "on_track":
@@ -89,7 +91,8 @@ export function PlanningBoard({
   liabilities: Option[];
   projects: Option[];
 }) {
-  const [filter, setFilter] = useState<QuickFilter>("all");
+  const [horizon, setHorizon] = useState<HorizonFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState<GoalType | "all">("all");
   const [overrideGoal, setOverrideGoal] = useState<GoalProgress | null>(null);
   const [overrideValue, setOverrideValue] = useState("");
@@ -100,10 +103,11 @@ export function PlanningBoard({
     () =>
       goals.filter(
         (g) =>
-          matchesFilter(g, filter) &&
+          matchesHorizon(g, horizon) &&
+          matchesStatus(g, statusFilter) &&
           (typeFilter === "all" || g.type === typeFilter)
       ),
-    [goals, filter, typeFilter]
+    [goals, horizon, statusFilter, typeFilter]
   );
 
   function archive(goal: GoalProgress) {
@@ -141,24 +145,51 @@ export function PlanningBoard({
         role="group"
         aria-label="Filtros de metas"
       >
-        {QUICK_FILTERS.map(({ key, label }) => (
-          <Button
-            key={key}
+        <Select
+          value={horizon}
+          onValueChange={(v) => setHorizon(v as HorizonFilter)}
+        >
+          <SelectTrigger
             size="sm"
-            variant={filter === key ? "default" : "outline"}
-            aria-pressed={filter === key}
-            onClick={() => setFilter(key)}
+            className="w-full sm:w-44"
+            aria-label="Filtrar por prazo"
           >
-            {label}
-          </Button>
-        ))}
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {HORIZON_OPTIONS.map(({ key, label }) => (
+              <SelectItem key={key} value={key}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-48"
+            aria-label="Filtrar por situação"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map(({ key, label }) => (
+              <SelectItem key={key} value={key}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select
           value={typeFilter}
           onValueChange={(v) => setTypeFilter(v as GoalType | "all")}
         >
           <SelectTrigger
             size="sm"
-            className="w-44"
+            className="w-full sm:w-48"
             aria-label="Filtrar por tipo"
           >
             <SelectValue />

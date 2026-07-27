@@ -145,9 +145,9 @@ export default async function InvestimentosPage() {
                       : null;
                   return (
                     <Card key={inv.id}>
-                      <CardContent className="flex flex-wrap items-center gap-3">
+                      <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                         <div className="flex min-w-0 flex-1 flex-col gap-1">
-                          <span className="truncate font-medium">
+                          <span className="font-medium break-words">
                             {inv.name}
                             {inv.subgroup ? (
                               <span className="text-muted-foreground font-normal">
@@ -178,27 +178,29 @@ export default async function InvestimentosPage() {
                             </>
                           )}
                         </div>
-                        <span className="text-sm font-semibold tabular-nums">
-                          {formatBRL(inv.currentBalance)}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <ContributionDialog
-                            investmentId={inv.id}
-                            investmentName={inv.name}
-                            accounts={accountOptions}
-                          />
-                          {canManage && (
-                            <>
-                              <InvestmentDialog
-                                investment={inv}
-                                accounts={accountOptions}
-                              />
-                              <InvestmentDeleteButton
-                                investmentId={inv.id}
-                                investmentName={inv.name}
-                              />
-                            </>
-                          )}
+                        <div className="flex items-center justify-between gap-2 sm:justify-end">
+                          <span className="text-sm font-semibold tabular-nums">
+                            {formatBRL(inv.currentBalance)}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <ContributionDialog
+                              investmentId={inv.id}
+                              investmentName={inv.name}
+                              accounts={accountOptions}
+                            />
+                            {canManage && (
+                              <>
+                                <InvestmentDialog
+                                  investment={inv}
+                                  accounts={accountOptions}
+                                />
+                                <InvestmentDeleteButton
+                                  investmentId={inv.id}
+                                  investmentName={inv.name}
+                                />
+                              </>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
