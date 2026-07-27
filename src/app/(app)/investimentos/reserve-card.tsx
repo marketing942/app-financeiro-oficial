@@ -69,7 +69,8 @@ export function ReserveCard({
         </CardTitle>
         <CardDescription>
           Meta manual ou calculada: média mensal das despesas essenciais dos
-          últimos 6 meses × meses desejados. Nenhuma quantidade é imposta.
+          últimos meses (até 6, incluindo o atual) × meses desejados. Nenhuma
+          quantidade é imposta.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">

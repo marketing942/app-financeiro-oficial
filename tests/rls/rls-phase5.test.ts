@@ -278,8 +278,9 @@ describe.skipIf(!databaseUrl)("Investimentos (Fase 5)", () => {
         [cat.id, owner.workspaceId]
       );
 
-      // Despesa essencial realizada em cada um dos últimos 3 meses fechados
-      // (média 6m = 3 × 600 / 6 = 300).
+      // Despesa essencial realizada em cada um dos últimos 3 meses fechados.
+      // Média = soma / meses COM dados = 1800 / 3 = 600 (divide só pelos
+      // meses que realmente têm despesa essencial, não por 6 fixo).
       for (let i = 1; i <= 3; i++) {
         await c.query(
           `insert into transactions (workspace_id, nature, description,
@@ -299,12 +300,12 @@ describe.skipIf(!databaseUrl)("Investimentos (Fase 5)", () => {
         [owner.workspaceId]
       );
       const summary = rows[0];
-      expect(summary.essential_monthly_avg).toBe("300.00");
-      expect(summary.computed_target).toBe("1800.00");
-      expect(summary.effective_target).toBe("1800.00");
+      expect(summary.essential_monthly_avg).toBe("600.00");
+      expect(summary.computed_target).toBe("3600.00");
+      expect(summary.effective_target).toBe("3600.00");
       expect(summary.current_balance).toBe("2500.00");
-      // 2500/1800 = 138.89% — acima da meta.
-      expect(Number(summary.percent)).toBeCloseTo(138.89, 1);
+      // 2500/3600 = 69.44% — abaixo da meta.
+      expect(Number(summary.percent)).toBeCloseTo(69.44, 1);
     });
   });
 });
