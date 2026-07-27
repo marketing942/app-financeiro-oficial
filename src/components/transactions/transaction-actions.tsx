@@ -383,7 +383,7 @@ export function TransactionActions({
             <DialogTitle>Excluir “{row.description}”?</DialogTitle>
             <DialogDescription>
               {row.seriesId
-                ? "Este lançamento faz parte de uma recorrência (recorrente, parcelada ou eterna). Escolha se quer excluir só este ou também os próximos ainda em aberto — os já realizados são sempre preservados."
+                ? "Este lançamento faz parte de uma recorrência (recorrente, parcelada ou eterna). Escolha excluir só este (mesmo já pago) ou este e os próximos ainda em aberto — as ocorrências já realizadas de outros meses são preservadas."
                 : "A exclusão é lógica e auditada: o lançamento sai das listas e dos cálculos, mas o histórico é preservado. Requer a permissão de excluir lançamentos."}
             </DialogDescription>
           </DialogHeader>
