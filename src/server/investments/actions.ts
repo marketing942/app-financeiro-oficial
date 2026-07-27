@@ -30,6 +30,8 @@ const investmentSchema = z.object({
 
 const investmentUpdateSchema = investmentSchema.extend({
   investmentId: z.string().uuid(),
+  // Valor atual real do investimento (resgate/rendimento/correção). Opcional.
+  currentValue: nonNegativeMoneySchema.optional().or(z.literal("")),
 });
 
 const contributionSchema = z.object({
@@ -145,10 +147,24 @@ export async function updateInvestment(input: unknown): Promise<ActionResult> {
     })
     .eq("id", d.investmentId)
     .eq("workspace_id", ctx.workspace.id)
-    .select("id")
+    .select("id, current_balance")
     .maybeSingle();
 
   if (error || !data) return { error: GENERIC_ERROR };
+
+  // Ajuste do valor atual real (resgate/rendimento) — só quando mudou.
+  if (d.currentValue && Number(d.currentValue) !== Number(data.current_balance)) {
+    const { data: ok, error: balError } = await ctx.supabase.rpc(
+      "set_investment_balance",
+      { p_investment: d.investmentId, p_value: d.currentValue }
+    );
+    if (balError || !ok) {
+      if (balError?.message.includes("not_authorized")) {
+        return { error: "Você não tem permissão para gerenciar investimentos." };
+      }
+      return { error: GENERIC_ERROR };
+    }
+  }
 
   await ctx.supabase.from("audit_logs").insert({
     workspace_id: ctx.workspace.id,
@@ -160,6 +176,8 @@ export async function updateInvestment(input: unknown): Promise<ActionResult> {
   });
 
   revalidatePath("/investimentos");
+  revalidatePath("/patrimonio");
+  revalidatePath("/");
   return { success: true };
 }
 

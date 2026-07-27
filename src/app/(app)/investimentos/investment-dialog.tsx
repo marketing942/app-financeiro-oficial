@@ -40,6 +40,7 @@ const formSchema = z.object({
   subgroup: z.string().trim().max(80).optional(),
   initialAmount: z.string(),
   targetAmount: z.string(),
+  currentValue: z.string(),
 });
 
 type FormInput = z.infer<typeof formSchema>;
@@ -68,6 +69,7 @@ export function InvestmentDialog({
       subgroup: investment?.subgroup ?? "",
       initialAmount: investment?.initialAmount.replace(".", ",") ?? "0,00",
       targetAmount: investment?.targetAmount?.replace(".", ",") ?? "",
+      currentValue: investment?.currentBalance.replace(".", ",") ?? "",
     },
   });
 
@@ -166,7 +168,22 @@ export function InvestmentDialog({
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {!isEdit && (
+            {isEdit ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="inv-current">Valor atual (R$)</Label>
+                <Input
+                  id="inv-current"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  {...form.register("currentValue")}
+                />
+                <p className="text-muted-foreground text-xs">
+                  Informe o valor real hoje — use para refletir resgates,
+                  rendimento ou corrigir o saldo. Aportes futuros continuam
+                  somando sobre este valor.
+                </p>
+              </div>
+            ) : (
               <div className="flex flex-col gap-2">
                 <Label htmlFor="inv-initial">Saldo inicial (R$)</Label>
                 <Input
