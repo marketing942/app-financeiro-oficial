@@ -54,8 +54,9 @@ import {
   type Option,
 } from "@/app/(app)/despesas/expense-dialog";
 import { IncomeDialog } from "@/app/(app)/receitas/income-dialog";
+import { ContributionEditDialog } from "@/app/(app)/investimentos/contribution-edit-dialog";
 
-type Kind = "income" | "expense";
+type Kind = "income" | "expense" | "investment";
 
 export function TransactionActions({
   row,
@@ -93,7 +94,8 @@ export function TransactionActions({
   const canEdit =
     isOpenStatus &&
     ((kind === "expense" && !!expenseCategories && !!accounts) ||
-      (kind === "income" && !!incomeCategories && !!accounts));
+      (kind === "income" && !!incomeCategories && !!accounts) ||
+      (kind === "investment" && !!accounts));
 
   function run(
     action: () => Promise<{ error: string } | { success: true }>,
@@ -129,7 +131,9 @@ export function TransactionActions({
         ? "Valor parcial registrado."
         : kind === "income"
           ? "Receita marcada como recebida."
-          : "Despesa marcada como paga.",
+          : kind === "investment"
+            ? "Aporte registrado."
+            : "Despesa marcada como paga.",
       () => setRealizeOpen(false)
     );
   }
@@ -275,6 +279,14 @@ export function TransactionActions({
           categories={incomeCategories}
           accounts={accounts}
           transaction={row}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+        />
+      )}
+      {canEdit && kind === "investment" && accounts && (
+        <ContributionEditDialog
+          transaction={row}
+          accounts={accounts}
           open={editOpen}
           onOpenChange={setEditOpen}
         />

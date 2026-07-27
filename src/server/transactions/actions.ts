@@ -15,7 +15,7 @@ import {
 import { getActiveWorkspace } from "@/server/workspaces/queries";
 
 const GENERIC_ERROR = "Não foi possível concluir a operação. Tente novamente.";
-const PATHS = ["/receitas", "/despesas"];
+const PATHS = ["/receitas", "/despesas", "/investimentos", "/patrimonio", "/"];
 
 type ActionResult = { error: string } | { success: true };
 

@@ -12,9 +12,12 @@ import {
 } from "@/lib/finance/investments";
 import { getAccounts } from "@/server/accounts/queries";
 import { getCategories } from "@/server/categories/queries";
+import { listTransactionsByMonth } from "@/server/transactions/queries";
 import { createClient } from "@/lib/supabase/server";
 import { resolvePermission } from "@/lib/permissions";
 import { decimalToCents, formatBRL } from "@/lib/finance/money";
+import { EXPENSE_STATUS_LABELS, formatDateBR, STATUS_BADGE_VARIANTS } from "@/lib/finance/labels";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -22,6 +25,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { MonthNav } from "@/components/month-nav";
+import { TransactionActions } from "@/components/transactions/transaction-actions";
 import { InvestmentDialog } from "./investment-dialog";
 import { InvestmentDeleteButton } from "./investment-delete-button";
 import { ContributionDialog } from "./contribution-dialog";
@@ -36,17 +41,29 @@ const GROUP_ORDER: InvestmentGroup[] = [
   "future_projects",
 ];
 
-export default async function InvestimentosPage() {
+function currentMonth(): string {
+  return new Date().toISOString().slice(0, 7);
+}
+
+export default async function InvestimentosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mes?: string }>;
+}) {
+  const { mes } = await searchParams;
+  const month = /^\d{4}-\d{2}$/.test(mes ?? "") ? mes! : currentMonth();
+
   const { active } = await getActiveWorkspace();
   if (!active) return null;
 
   const supabase = await createClient();
-  const [investments, reserve, accounts, categories, settingsRow] =
+  const [investments, reserve, accounts, categories, contributions, settingsRow] =
     await Promise.all([
       listInvestments(active.id),
       getReserveSummary(active.id),
       getAccounts(active.id),
       getCategories(active.id, "expense"),
+      listTransactionsByMonth(active.id, month, ["investment_contribution"]),
       supabase
         .from("workspace_settings")
         .select("essential_category_ids")
@@ -210,6 +227,68 @@ export default async function InvestimentosPage() {
           </section>
         ))
       )}
+
+      <section aria-label="Aportes do mês" className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold">Aportes do mês</h2>
+            <p className="text-muted-foreground text-xs">
+              Aportes previstos e realizados. Os recorrentes aparecem todo mês
+              para você informar o pagamento, adiar, editar ou excluir.
+            </p>
+          </div>
+          <MonthNav month={month} basePath="/investimentos" />
+        </div>
+
+        {contributions.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="text-muted-foreground py-6 text-center text-sm">
+              Nenhum aporte neste mês. Use “Lançar aporte” e escolha uma
+              repetição para programá-los automaticamente.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {contributions.map((row) => (
+              <Card key={row.id}>
+                <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium break-words">
+                        {row.description}
+                        {row.installmentNumber
+                          ? ` (${row.installmentNumber}/${row.installmentCount})`
+                          : ""}
+                      </span>
+                      <Badge variant={STATUS_BADGE_VARIANTS[row.status]}>
+                        {EXPENSE_STATUS_LABELS[row.status]}
+                      </Badge>
+                    </div>
+                    <span className="text-muted-foreground text-xs">
+                      Vence {formatDateBR(row.dueDate)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 sm:justify-end">
+                    <div className="flex flex-col items-start tabular-nums sm:items-end">
+                      <span className="text-sm font-semibold">
+                        {formatBRL(row.actualAmount ?? "0")}
+                      </span>
+                      <span className="text-muted-foreground text-xs">
+                        de {formatBRL(row.plannedAmount ?? "0")} previsto
+                      </span>
+                    </div>
+                    <TransactionActions
+                      row={row}
+                      kind="investment"
+                      accounts={accountOptions}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

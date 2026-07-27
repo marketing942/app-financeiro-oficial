@@ -349,6 +349,55 @@ export async function createContribution(
   return { success: true };
 }
 
+const contributionUpdateSchema = z.object({
+  transactionId: z.string().uuid(),
+  amount: nonNegativeMoneySchema,
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida."),
+  accountId: z.string().uuid().optional().or(z.literal("")),
+});
+
+// Edita um aporte previsto (valor planejado, data, conta). O realizado, se
+// houver, é preservado — igual à edição de despesas/receitas.
+export async function updateContribution(
+  input: unknown
+): Promise<ActionResult> {
+  const parsed = contributionUpdateSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+  const ctx = await requireContext();
+  if (!ctx) return { error: GENERIC_ERROR };
+
+  const d = parsed.data;
+  const { data, error } = await ctx.supabase
+    .from("transactions")
+    .update({
+      planned_amount: d.amount,
+      due_date: d.date,
+      competence_month: `${d.date.slice(0, 7)}-01`,
+      account_id: d.accountId || null,
+      updated_by: ctx.user.id,
+    })
+    .eq("id", d.transactionId)
+    .eq("workspace_id", ctx.workspace.id)
+    .eq("nature", "investment_contribution")
+    .select("id")
+    .maybeSingle();
+  if (error || !data) return { error: GENERIC_ERROR };
+
+  await ctx.supabase.from("audit_logs").insert({
+    workspace_id: ctx.workspace.id,
+    user_id: ctx.user.id,
+    action: "contribution.updated",
+    entity_type: "transaction",
+    entity_id: d.transactionId,
+    summary: "Aporte previsto editado",
+  });
+
+  revalidatePath("/investimentos");
+  return { success: true };
+}
+
 export async function updateReserveSettings(
   input: unknown
 ): Promise<ActionResult> {
