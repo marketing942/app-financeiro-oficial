@@ -189,6 +189,33 @@ export async function sellAssetAction(input: unknown): Promise<ActionResult> {
   return { success: true };
 }
 
+export async function deleteSnapshot(input: unknown): Promise<ActionResult> {
+  const parsed = z.object({ snapshotId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { error: GENERIC_ERROR };
+  const ctx = await requireContext();
+  if (
+    !ctx ||
+    !resolvePermission(ctx.workspace.role, ctx.workspace.permissions, "edit_assets")
+  ) {
+    return { error: "Você não tem permissão para gerenciar o patrimônio." };
+  }
+
+  const { data, error } = await ctx.supabase.rpc("delete_net_worth_snapshot", {
+    p_snapshot_id: parsed.data.snapshotId,
+  });
+
+  if (error) {
+    if (error.message.includes("not_authorized")) {
+      return { error: "Você não tem permissão para gerenciar o patrimônio." };
+    }
+    return { error: GENERIC_ERROR };
+  }
+  if (!data) return { error: GENERIC_ERROR };
+
+  revalidatePath("/patrimonio");
+  return { success: true };
+}
+
 export async function takeSnapshot(): Promise<ActionResult> {
   const ctx = await requireContext();
   if (!ctx) return { error: GENERIC_ERROR };

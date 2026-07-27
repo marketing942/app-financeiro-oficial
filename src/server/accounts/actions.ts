@@ -119,6 +119,39 @@ export async function updateAccount(input: unknown): Promise<ActionResult> {
   return { success: true };
 }
 
+// Exclusão lógica da conta: some das listas e dos cálculos (RLS filtra
+// deleted_at), mas o histórico dos lançamentos é preservado (regra 9).
+export async function deleteAccount(input: unknown): Promise<ActionResult> {
+  const parsed = accountIdSchema.safeParse(input);
+  if (!parsed.success) return { error: GENERIC_ERROR };
+
+  const ctx = await requireOwnerContext();
+  if (!ctx) return { error: "Apenas o proprietário gerencia contas." };
+
+  const { data, error } = await ctx.supabase
+    .from("financial_accounts")
+    .update({ deleted_at: new Date().toISOString(), updated_by: ctx.user.id })
+    .eq("id", parsed.data.accountId)
+    .eq("workspace_id", ctx.workspace.id)
+    .is("deleted_at", null)
+    .select("name")
+    .maybeSingle();
+
+  if (error || !data) return { error: GENERIC_ERROR };
+
+  await ctx.supabase.from("audit_logs").insert({
+    workspace_id: ctx.workspace.id,
+    user_id: ctx.user.id,
+    action: "account.deleted",
+    entity_type: "financial_account",
+    entity_id: parsed.data.accountId,
+    summary: `Conta "${data.name}" excluída (exclusão lógica)`,
+  });
+
+  revalidatePath("/contas");
+  return { success: true };
+}
+
 export async function setAccountArchived(
   input: unknown,
   archived: boolean

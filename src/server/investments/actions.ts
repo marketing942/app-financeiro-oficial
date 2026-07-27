@@ -205,6 +205,40 @@ export async function setInvestmentArchived(
   return { success: true };
 }
 
+// Exclusão lógica do investimento (preserva histórico de aportes; regra 9).
+export async function deleteInvestment(input: unknown): Promise<ActionResult> {
+  const parsed = z
+    .object({ investmentId: z.string().uuid() })
+    .safeParse(input);
+  if (!parsed.success) return { error: GENERIC_ERROR };
+  const ctx = await requireContext();
+  if (
+    !ctx ||
+    !resolvePermission(
+      ctx.workspace.role,
+      ctx.workspace.permissions,
+      "edit_investments"
+    )
+  ) {
+    return { error: "Você não tem permissão para gerenciar investimentos." };
+  }
+
+  const { data, error } = await ctx.supabase.rpc("soft_delete_investment", {
+    p_investment_id: parsed.data.investmentId,
+  });
+
+  if (error) {
+    if (error.message.includes("not_authorized")) {
+      return { error: "Você não tem permissão para gerenciar investimentos." };
+    }
+    return { error: GENERIC_ERROR };
+  }
+  if (!data) return { error: GENERIC_ERROR };
+
+  revalidatePath("/investimentos");
+  return { success: true };
+}
+
 // Aporte: transação de natureza investment_contribution (o trigger cria o
 // vínculo 1:1 e recomputa o saldo). Mensal → série recorrente.
 export async function createContribution(

@@ -22,6 +22,7 @@ import {
 import { AssetDialog } from "./asset-dialog";
 import { AssetCard } from "./asset-card";
 import { SnapshotButton } from "./snapshot-button";
+import { SnapshotDeleteButton } from "./snapshot-delete-button";
 
 export const metadata: Metadata = { title: "Patrimônio" };
 
@@ -174,13 +175,16 @@ export default async function PatrimonioPage() {
                     <th className="py-2 pr-4 text-right font-medium">
                       Dívidas
                     </th>
-                    <th className="py-2 text-right font-medium">Líquido</th>
+                    <th className="py-2 pr-4 text-right font-medium">
+                      Líquido
+                    </th>
+                    {canManage && <th className="py-2 w-10" aria-label="Ações" />}
                   </tr>
                 </thead>
                 <tbody>
                   {snapshots.map((snap) => (
                     <tr
-                      key={snap.snapshotDate}
+                      key={snap.id}
                       className="border-b tabular-nums last:border-0"
                     >
                       <td className="py-2 pr-4">
@@ -192,9 +196,17 @@ export default async function PatrimonioPage() {
                       <td className="text-destructive py-2 pr-4 text-right">
                         {formatBRL(snap.totalLiabilities)}
                       </td>
-                      <td className="text-primary py-2 text-right font-medium">
+                      <td className="text-primary py-2 pr-4 text-right font-medium">
                         {formatBRL(snap.netWorth)}
                       </td>
+                      {canManage && (
+                        <td className="py-2 text-right">
+                          <SnapshotDeleteButton
+                            snapshotId={snap.id}
+                            label={formatDateBR(snap.snapshotDate)}
+                          />
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

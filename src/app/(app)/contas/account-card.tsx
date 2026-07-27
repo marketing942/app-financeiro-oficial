@@ -4,7 +4,7 @@ import { createElement, useTransition } from "react";
 import { Archive, ArchiveRestore, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { setAccountArchived } from "@/server/accounts/actions";
+import { deleteAccount, setAccountArchived } from "@/server/accounts/actions";
 import type { FinancialAccount } from "@/server/accounts/queries";
 import { ACCOUNT_TYPE_LABELS } from "@/lib/validation/finance";
 import { formatBRL } from "@/lib/finance/money";
@@ -12,6 +12,7 @@ import { getIcon } from "@/lib/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { AccountDialog } from "./account-dialog";
 
 const TYPE_ICONS: Record<string, string> = {
@@ -102,6 +103,13 @@ export function AccountCard({
                 <Archive />
               )}
             </Button>
+            <ConfirmDeleteButton
+              ariaLabel={`Excluir conta ${account.name}`}
+              title={`Excluir “${account.name}”?`}
+              description="A conta sai das listas e dos cálculos. Os lançamentos vinculados são preservados (exclusão lógica). Se quiser apenas escondê-la temporariamente, use arquivar."
+              successMessage="Conta excluída."
+              onConfirm={() => deleteAccount({ accountId: account.id })}
+            />
           </div>
         )}
       </CardContent>

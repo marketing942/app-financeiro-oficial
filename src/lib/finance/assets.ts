@@ -60,6 +60,7 @@ export type NetWorth = {
 };
 
 export type Snapshot = {
+  id: string;
   snapshotDate: string;
   grossWorth: string;
   totalLiabilities: string;

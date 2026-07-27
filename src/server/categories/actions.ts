@@ -172,6 +172,62 @@ export async function setCategoryArchived(
   return { success: true };
 }
 
+// Exclusão definitiva da categoria (e suas subcategorias). Recusada pelo
+// banco se houver lançamentos vinculados — nesse caso, arquive.
+export async function deleteCategory(input: unknown): Promise<ActionResult> {
+  const parsed = categoryIdSchema.safeParse(input);
+  if (!parsed.success) return { error: GENERIC_ERROR };
+
+  const ctx = await requireCategoryEditor();
+  if (!ctx) return { error: NO_PERMISSION };
+
+  const { data, error } = await ctx.supabase.rpc("delete_category", {
+    p_category_id: parsed.data.categoryId,
+  });
+
+  if (error) {
+    if (error.message.includes("category_in_use")) {
+      return {
+        error:
+          "Não é possível excluir: há lançamentos usando esta categoria ou suas subcategorias. Arquive-a em vez de excluir.",
+      };
+    }
+    if (error.message.includes("not_authorized")) return { error: NO_PERMISSION };
+    return { error: GENERIC_ERROR };
+  }
+  if (!data) return { error: GENERIC_ERROR };
+
+  revalidatePath("/categorias");
+  return { success: true };
+}
+
+export async function deleteSubcategory(input: unknown): Promise<ActionResult> {
+  const parsed = subcategoryIdSchema.safeParse(input);
+  if (!parsed.success) return { error: GENERIC_ERROR };
+
+  const ctx = await requireCategoryEditor();
+  if (!ctx) return { error: NO_PERMISSION };
+
+  const { data, error } = await ctx.supabase.rpc("delete_subcategory", {
+    p_subcategory_id: parsed.data.subcategoryId,
+  });
+
+  if (error) {
+    if (error.message.includes("subcategory_in_use")) {
+      return {
+        error:
+          "Não é possível excluir: há lançamentos usando esta subcategoria. Arquive-a em vez de excluir.",
+      };
+    }
+    if (error.message.includes("not_authorized")) return { error: NO_PERMISSION };
+    return { error: GENERIC_ERROR };
+  }
+  if (!data) return { error: GENERIC_ERROR };
+
+  revalidatePath("/categorias");
+  return { success: true };
+}
+
 export async function reorderCategory(input: unknown): Promise<ActionResult> {
   const parsed = reorderCategorySchema.safeParse(input);
   if (!parsed.success) return { error: GENERIC_ERROR };

@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { InvestmentDialog } from "./investment-dialog";
+import { InvestmentDeleteButton } from "./investment-delete-button";
 import { ContributionDialog } from "./contribution-dialog";
 import { ReserveCard } from "./reserve-card";
 
@@ -187,10 +188,16 @@ export default async function InvestimentosPage() {
                             accounts={accountOptions}
                           />
                           {canManage && (
-                            <InvestmentDialog
-                              investment={inv}
-                              accounts={accountOptions}
-                            />
+                            <>
+                              <InvestmentDialog
+                                investment={inv}
+                                accounts={accountOptions}
+                              />
+                              <InvestmentDeleteButton
+                                investmentId={inv.id}
+                                investmentName={inv.name}
+                              />
+                            </>
                           )}
                         </div>
                       </CardContent>

@@ -17,6 +17,8 @@ import { toast } from "sonner";
 
 import {
   createSubcategory,
+  deleteCategory,
+  deleteSubcategory,
   reorderCategory,
   setCategoryArchived,
   setSubcategoryArchived,
@@ -27,6 +29,7 @@ import { getIcon } from "@/lib/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Input } from "@/components/ui/input";
 import { CategoryDialog } from "./category-dialog";
 
@@ -122,6 +125,14 @@ function SubcategoryItem({ sub }: { sub: Subcategory }) {
               <Archive className="size-3.5" />
             )}
           </Button>
+          <ConfirmDeleteButton
+            className="size-7"
+            ariaLabel={`Excluir subcategoria ${sub.name}`}
+            title={`Excluir subcategoria “${sub.name}”?`}
+            description="Exclusão definitiva. Só é possível se não houver lançamentos usando esta subcategoria — caso contrário, arquive."
+            successMessage="Subcategoria excluída."
+            onConfirm={() => deleteSubcategory({ subcategoryId: sub.id })}
+          />
         </>
       )}
     </li>
@@ -250,6 +261,13 @@ export function CategoryRow({
               >
                 {archived ? <ArchiveRestore /> : <Archive />}
               </Button>
+              <ConfirmDeleteButton
+                ariaLabel={`Excluir categoria ${category.name}`}
+                title={`Excluir categoria “${category.name}”?`}
+                description="Exclui a categoria e suas subcategorias definitivamente. Só é possível se não houver lançamentos vinculados — caso contrário, arquive."
+                successMessage="Categoria excluída."
+                onConfirm={() => deleteCategory({ categoryId: category.id })}
+              />
             </div>
           )}
         </div>

@@ -65,12 +65,13 @@ export async function listSnapshots(
   const supabase = await createClient();
   const { data } = await supabase
     .from("net_worth_snapshots")
-    .select("snapshot_date, gross_worth, total_liabilities, net_worth")
+    .select("id, snapshot_date, gross_worth, total_liabilities, net_worth")
     .eq("workspace_id", workspaceId)
     .order("snapshot_date", { ascending: false })
     .limit(limit);
 
   return (data ?? []).map((row) => ({
+    id: row.id,
     snapshotDate: row.snapshot_date,
     grossWorth: String(row.gross_worth),
     totalLiabilities: String(row.total_liabilities),
