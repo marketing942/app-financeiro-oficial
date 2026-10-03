@@ -41,6 +41,27 @@ function friendlyAuthError(message: string): string {
   ) {
     return "A senha não atende aos requisitos mínimos de segurança.";
   }
+  // Falhas de conectividade com o Supabase (projeto pausado, URL/chave erradas,
+  // rede). "Carrega e volta erro" costuma cair aqui.
+  if (
+    normalized.includes("fetch failed") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("network") ||
+    normalized.includes("enotfound") ||
+    normalized.includes("econnrefused") ||
+    normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
+    normalized.includes("und_err") ||
+    normalized.includes("socket")
+  ) {
+    return "Não foi possível falar com o servidor de autenticação. Verifique sua conexão e se o projeto Supabase está ativo (projetos gratuitos pausam por inatividade).";
+  }
+  if (
+    normalized.includes("database error") ||
+    normalized.includes("unexpected_failure")
+  ) {
+    return "Erro interno do servidor de autenticação (Supabase). Tente novamente; se persistir, veja os logs.";
+  }
   return "Não foi possível concluir a operação. Tente novamente.";
 }
 
@@ -60,13 +81,25 @@ export async function signIn(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
-    email: parsed.data.email,
-    password: parsed.data.password,
-  });
+  let authError: { message: string } | null = null;
+  try {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: parsed.data.email,
+      password: parsed.data.password,
+    });
+    authError = error;
+  } catch (thrown) {
+    // Falha de rede/infra costuma ser lançada (não retornada).
+    authError = {
+      message: thrown instanceof Error ? thrown.message : String(thrown),
+    };
+  }
 
-  if (error) {
-    return { error: friendlyAuthError(error.message) };
+  if (authError) {
+    // Loga a causa real (aparece nos logs da Vercel); o usuário vê só a
+    // mensagem amigável.
+    console.error("[auth] signIn falhou:", authError.message);
+    return { error: friendlyAuthError(authError.message) };
   }
 
   revalidatePath("/", "layout");
